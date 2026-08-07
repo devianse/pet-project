@@ -1,5 +1,9 @@
 # --- Go (backend/) ---
 /backend/bin/
+# `go build ./...` from backend/ drops the binary at the module root, named
+# after cmd/api — not into bin/. Ignore it directly rather than relying on
+# always remembering `-o bin/api`.
+/backend/api
 *.exe
 *.test
 *.out
