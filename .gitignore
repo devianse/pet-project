@@ -21,6 +21,9 @@
 .env.*
 !.env.example
 
+# --- Claude Code ---
+/.claude/worktrees/
+
 # --- Editor / OS cruft ---
 .DS_Store
 .vscode/*
