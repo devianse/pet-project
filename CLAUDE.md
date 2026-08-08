@@ -1,10 +1,9 @@
 # pet-projects
 
-Personal portfolio platform: Go backend + React (Vite) SPA, built as a
-shell that domain projects (Family Shopping List, Image Processing) plug
-into later. Full architecture and reasoning: [`PLANNING.md`](./PLANNING.md).
-This file is orientation for me, not a duplicate of it — check `PLANNING.md`
-before assuming a decision hasn't been made.
+Orientation for me, not a duplicate of the other docs — see
+[`README.md`](./README.md) for what this is and how to run it, and
+[`PLANNING.md`](./PLANNING.md) for the full architecture and reasoning.
+Check both before assuming a decision hasn't been made.
 
 ## Current phase
 
@@ -16,36 +15,25 @@ picture.
 
 ## Layout
 
-```
-backend/   Go API (cmd/api is the entrypoint binary)
-frontend/  React SPA (Vite)
-```
-
-`infra/` and `docs/` are deliberately not created yet — nothing to put in
-either until deployment/real docs are actually needed. Not an oversight.
+See `README.md`'s "Layout" section for the directory tree. `infra/` and
+`docs/` are deliberately not created yet — nothing to put in either until
+deployment/real docs are actually needed. Not an oversight.
 
 ## Commands
 
-```
-make dev-backend      # Go API on :8080, needs its own terminal
-make dev-frontend     # Vite dev server on :3000, proxies /api -> backend
-make build-backend    # go build ./...
-make build-frontend   # tsc -b && vite build
-make lint-frontend    # oxlint
-```
-
-Both dev servers block and must run in separate terminals simultaneously
-— see `README.md`'s "Running locally" section for the full explanation.
+See `README.md`'s "Running locally" and "Other commands" sections for the
+full `make` target list — both dev servers block and must run in separate
+terminals simultaneously, which README explains in detail.
 
 ## Conventions
 
 - **Never commit without being asked.** Staging/committing is the user's
   call, every time — not implied by "this looks done."
 - **Env vars**: each app has a `.env.example` (checked in) and `.env`
-  (gitignored, real values). Backend loads `.env` via `godotenv` with
-  `PORT` as the only var so far; frontend's `vite.config.ts` reads
-  `API_PROXY_TARGET` and `FRONTEND_PORT` via `loadEnv` (Node-side only,
-  never shipped to the browser bundle — no `VITE_` prefix needed).
+  (gitignored, real values) — see README's "Env config" section for the
+  actual var list. Backend loads its via `godotenv`; frontend's
+  `vite.config.ts` reads its via `loadEnv` (Node-side only, never shipped
+  to the browser bundle — no `VITE_` prefix needed).
 - Frontend dev server defaults to port 3000 (not Vite's default 5173) —
   a deliberate choice, not a leftover.
 
