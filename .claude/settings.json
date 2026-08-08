@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./backend/.env)",
+      "Read(./frontend/.env)",
+      "Read(./**/secrets/**)",
+      "Grep(./backend/.env)",
+      "Grep(./frontend/.env)",
+      "Grep(./**/secrets/**)",
+      "Glob(./**/secrets/**)"
+    ]
+  }
+}
