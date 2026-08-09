@@ -35,14 +35,12 @@ matches the shell-first order above one-for-one:
    ahead of real JWT auth, manual dependency/secret scans. Needed now
    because step 6 below deploys without phase-2 auth existing yet. See
    `docs/superpowers/specs/2026-08-09-pre-deployment-security-design.md`.
-5. **Movie/TV Sharing List** (next, not yet designed) — another
-   pre-phase-3 detour, same pattern as Notes: a shareable watchlist,
-   insert a link, get a preview card (title, description, poster image),
-   mark items as viewed/expand for detail. Likely needs a third-party
-   metadata source (IMDb vs. Kinopoisk under consideration — access/rate
-   limits from Russia unverified for either) — that's a real design
-   question for its own brainstorming pass when this is picked up, not
-   resolved here.
+5. **Movie/TV Sharing List** (in progress) — another pre-phase-3 detour,
+   same pattern as Notes: a shareable watchlist, paste an IMDb link, get
+   a preview card (title, description, poster image) resolved via TMDb,
+   mark items as viewed/expand for detail. See
+   `docs/superpowers/specs/2026-08-09-movie-tv-sharing-list-design.md`
+   and `docs/superpowers/plans/2026-08-09-movie-tv-sharing-list.md`.
 6. **First VPS deployment attempt** — see "Deployment target" below.
    Happens once step 5 lands, still without phase-2 auth (the
    security-hardening pass in step 4 is what makes that acceptable).
@@ -122,10 +120,11 @@ Corrected framing from earlier in planning: OCR/photo parsing isn't a shopping-l
   since it's just describing reality at this point, not a pending
   decision.
 - ~~VPS provider~~ — resolved, Cloudzy (see "Deployment target" above).
-- **Movie Sharing's metadata source** — IMDb vs. Kinopoisk (or another
-  option), access/rate-limit/availability-from-Russia unverified for
-  either. Needs its own brainstorming pass when that feature is picked
-  up (step 5 above).
+- ~~Movie Sharing's metadata source~~ — resolved, TMDb (see
+  `docs/superpowers/specs/2026-08-09-movie-tv-sharing-list-design.md`).
+  Link parsing is IMDb-URL-only; TMDb's `/find` resolves the id. TMDb's
+  Russia/Belarus IP block doesn't reach a Cloudzy-hosted backend, since
+  the block is IP-based and Cloudzy has no Russia region.
 - Which of Shopping List / Image Processing gets built first once phase
   3 resumes, or whether they're built in parallel
 - OCR approach (local Tesseract vs cloud API), if/when Image Processing gets built — not needed until that project is actually underway
