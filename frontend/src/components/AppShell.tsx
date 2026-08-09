@@ -17,6 +17,7 @@ const NAV_ITEMS: { href: string; label: string; icon: IconName }[] = [
   { href: '/shopping-list', label: 'Shopping List', icon: 'cart' },
   { href: '/image-processing', label: 'Image Processing', icon: 'photo' },
   { href: '/notes', label: 'Notes', icon: 'log' },
+  { href: '/watchlist', label: 'Watchlist', icon: 'play' },
 ]
 
 // Below `md` this reflows to a plain horizontal bar via Tailwind's
