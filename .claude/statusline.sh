@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Claude Code statusline for pet-projects.
-# Reads JSON on stdin, prints: repo | branch | context | 5h | 7d | model | effort
+# Reads JSON on stdin, prints: repo | branch | context | 5h (+ reset) | 7d | model | effort
 
 input=$(cat)
 
@@ -56,11 +56,34 @@ fi
 
 # --- rate limits (Pro/Max plans only; absent otherwise) ------------------
 five_h=$(echo "$input" | jq -r '.rate_limits.five_hour.used_percentage // empty')
+five_h_resets_at=$(echo "$input" | jq -r '.rate_limits.five_hour.resets_at // empty')
 seven_d=$(echo "$input" | jq -r '.rate_limits.seven_day.used_percentage // empty')
+
+# Format a unix timestamp as "Xh Ym" (or "Ym") until reset, empty if absent/past.
+format_reset() {
+  local ts="$1"
+  [ -z "$ts" ] && return
+  local now secs
+  now=$(date +%s)
+  secs=$(( ts - now ))
+  [ "$secs" -le 0 ] && return
+  local h=$(( secs / 3600 ))
+  local m=$(( (secs % 3600) / 60 ))
+  if [ "$h" -gt 0 ]; then
+    printf "%dh%02dm" "$h" "$m"
+  else
+    printf "%dm" "$m"
+  fi
+}
 
 if [ -n "$five_h" ]; then
   five_h_color=$(color_for_pct "$five_h")
-  five_h_str=$(LC_NUMERIC=C printf "5h %.0f%%" "$five_h")
+  five_h_reset=$(format_reset "$five_h_resets_at")
+  if [ -n "$five_h_reset" ]; then
+    five_h_str=$(LC_NUMERIC=C printf "5h %.0f%% (resets %s)" "$five_h" "$five_h_reset")
+  else
+    five_h_str=$(LC_NUMERIC=C printf "5h %.0f%%" "$five_h")
+  fi
 else
   five_h_color="$DIM"
   five_h_str="5h n/a"
