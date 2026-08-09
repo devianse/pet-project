@@ -47,10 +47,13 @@ export type WatchlistItem = {
   media_type: 'movie' | 'tv'
   tmdb_id: number
   title: string
+  original_title: string
+  original_language: string
   release_year: string | null
   poster_path: string | null
   overview: string
   vote_average: number
+  vote_count: number
   genres: string
   viewed: boolean
   created_at: string

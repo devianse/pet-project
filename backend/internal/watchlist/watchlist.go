@@ -14,29 +14,35 @@ import (
 // from WatchlistItem because a match hasn't been assigned a database id,
 // viewed flag, or created_at yet.
 type TMDbMatch struct {
-	MediaType   string // "movie" | "tv"
-	TMDbID      int
-	Title       string
-	ReleaseYear string // "" if TMDb has no date for this title
-	PosterPath  string // "" if TMDb has no poster for this title
-	Overview    string
-	VoteAverage float64
-	Genres      string // comma-joined genre names, "" if none resolved
+	MediaType        string // "movie" | "tv"
+	TMDbID           int
+	Title            string
+	OriginalTitle    string // TMDb's untranslated title/name, may equal Title
+	OriginalLanguage string // ISO 639-1 code, e.g. "en", "ko"
+	ReleaseYear      string // "" if TMDb has no date for this title
+	PosterPath       string // "" if TMDb has no poster for this title
+	Overview         string
+	VoteAverage      float64
+	VoteCount        int
+	Genres           string // comma-joined genre names, "" if none resolved
 }
 
 type WatchlistItem struct {
-	ID          int64     `json:"id"`
-	ImdbID      string    `json:"imdb_id"`
-	MediaType   string    `json:"media_type"`
-	TMDbID      int       `json:"tmdb_id"`
-	Title       string    `json:"title"`
-	ReleaseYear *string   `json:"release_year"`
-	PosterPath  *string   `json:"poster_path"`
-	Overview    string    `json:"overview"`
-	VoteAverage float64   `json:"vote_average"`
-	Genres      string    `json:"genres"`
-	Viewed      bool      `json:"viewed"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID               int64     `json:"id"`
+	ImdbID           string    `json:"imdb_id"`
+	MediaType        string    `json:"media_type"`
+	TMDbID           int       `json:"tmdb_id"`
+	Title            string    `json:"title"`
+	OriginalTitle    string    `json:"original_title"`
+	OriginalLanguage string    `json:"original_language"`
+	ReleaseYear      *string   `json:"release_year"`
+	PosterPath       *string   `json:"poster_path"`
+	Overview         string    `json:"overview"`
+	VoteAverage      float64   `json:"vote_average"`
+	VoteCount        int       `json:"vote_count"`
+	Genres           string    `json:"genres"`
+	Viewed           bool      `json:"viewed"`
+	CreatedAt        time.Time `json:"created_at"`
 }
 
 // ErrDuplicateImdbID is returned by Insert when imdb_id is already on the
@@ -54,7 +60,7 @@ func NewStore(conn *sql.DB) *Store {
 }
 
 func (s *Store) EnsureSchema(ctx context.Context) error {
-	_, err := s.conn.ExecContext(ctx, `
+	if _, err := s.conn.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS watchlist_items (
 			id           SERIAL PRIMARY KEY,
 			imdb_id      TEXT NOT NULL UNIQUE,
@@ -69,14 +75,28 @@ func (s *Store) EnsureSchema(ctx context.Context) error {
 			viewed       BOOLEAN NOT NULL DEFAULT false,
 			created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 		)
+	`); err != nil {
+		return err
+	}
+
+	// Added after the table's initial release — ADD COLUMN IF NOT EXISTS
+	// keeps this idempotent for both a fresh table (just created above)
+	// and one that already existed before these columns were added. No
+	// migration tool at this scale, matching the rest of this schema.
+	_, err := s.conn.ExecContext(ctx, `
+		ALTER TABLE watchlist_items
+			ADD COLUMN IF NOT EXISTS original_title TEXT NOT NULL DEFAULT '',
+			ADD COLUMN IF NOT EXISTS original_language TEXT NOT NULL DEFAULT '',
+			ADD COLUMN IF NOT EXISTS vote_count INTEGER NOT NULL DEFAULT 0
 	`)
 	return err
 }
 
 func (s *Store) List(ctx context.Context) ([]WatchlistItem, error) {
 	rows, err := s.conn.QueryContext(ctx, `
-		SELECT id, imdb_id, media_type, tmdb_id, title, release_year,
-		       poster_path, overview, vote_average, genres, viewed, created_at
+		SELECT id, imdb_id, media_type, tmdb_id, title, original_title,
+		       original_language, release_year, poster_path, overview,
+		       vote_average, vote_count, genres, viewed, created_at
 		FROM watchlist_items
 		ORDER BY created_at DESC, id DESC
 	`)
@@ -107,8 +127,9 @@ func scanItem(row rowScanner) (WatchlistItem, error) {
 	var releaseYear, posterPath sql.NullString
 	err := row.Scan(
 		&item.ID, &item.ImdbID, &item.MediaType, &item.TMDbID, &item.Title,
-		&releaseYear, &posterPath, &item.Overview, &item.VoteAverage,
-		&item.Genres, &item.Viewed, &item.CreatedAt,
+		&item.OriginalTitle, &item.OriginalLanguage, &releaseYear, &posterPath,
+		&item.Overview, &item.VoteAverage, &item.VoteCount, &item.Genres,
+		&item.Viewed, &item.CreatedAt,
 	)
 	if err != nil {
 		return WatchlistItem{}, err
@@ -138,12 +159,15 @@ func (s *Store) Insert(ctx context.Context, imdbID string, m *TMDbMatch) (*Watch
 
 	row := s.conn.QueryRowContext(ctx, `
 		INSERT INTO watchlist_items
-			(imdb_id, media_type, tmdb_id, title, release_year, poster_path, overview, vote_average, genres)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		RETURNING id, imdb_id, media_type, tmdb_id, title, release_year,
-		          poster_path, overview, vote_average, genres, viewed, created_at
-	`, imdbID, m.MediaType, m.TMDbID, m.Title, nullIfEmpty(m.ReleaseYear),
-		nullIfEmpty(m.PosterPath), m.Overview, m.VoteAverage, m.Genres)
+			(imdb_id, media_type, tmdb_id, title, original_title, original_language,
+			 release_year, poster_path, overview, vote_average, vote_count, genres)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		RETURNING id, imdb_id, media_type, tmdb_id, title, original_title,
+		          original_language, release_year, poster_path, overview,
+		          vote_average, vote_count, genres, viewed, created_at
+	`, imdbID, m.MediaType, m.TMDbID, m.Title, m.OriginalTitle, m.OriginalLanguage,
+		nullIfEmpty(m.ReleaseYear), nullIfEmpty(m.PosterPath), m.Overview,
+		m.VoteAverage, m.VoteCount, m.Genres)
 
 	item, err := scanItem(row)
 	if err != nil {

@@ -88,22 +88,28 @@ func (c *RealTMDbClient) fetchGenreMap(ctx context.Context, path string) (map[in
 
 type findResponse struct {
 	MovieResults []struct {
-		ID          int     `json:"id"`
-		Title       string  `json:"title"`
-		ReleaseDate string  `json:"release_date"`
-		PosterPath  string  `json:"poster_path"`
-		Overview    string  `json:"overview"`
-		VoteAverage float64 `json:"vote_average"`
-		GenreIDs    []int   `json:"genre_ids"`
+		ID               int     `json:"id"`
+		Title            string  `json:"title"`
+		OriginalTitle    string  `json:"original_title"`
+		OriginalLanguage string  `json:"original_language"`
+		ReleaseDate      string  `json:"release_date"`
+		PosterPath       string  `json:"poster_path"`
+		Overview         string  `json:"overview"`
+		VoteAverage      float64 `json:"vote_average"`
+		VoteCount        int     `json:"vote_count"`
+		GenreIDs         []int   `json:"genre_ids"`
 	} `json:"movie_results"`
 	TVResults []struct {
-		ID           int     `json:"id"`
-		Name         string  `json:"name"`
-		FirstAirDate string  `json:"first_air_date"`
-		PosterPath   string  `json:"poster_path"`
-		Overview     string  `json:"overview"`
-		VoteAverage  float64 `json:"vote_average"`
-		GenreIDs     []int   `json:"genre_ids"`
+		ID               int     `json:"id"`
+		Name             string  `json:"name"`
+		OriginalName     string  `json:"original_name"`
+		OriginalLanguage string  `json:"original_language"`
+		FirstAirDate     string  `json:"first_air_date"`
+		PosterPath       string  `json:"poster_path"`
+		Overview         string  `json:"overview"`
+		VoteAverage      float64 `json:"vote_average"`
+		VoteCount        int     `json:"vote_count"`
+		GenreIDs         []int   `json:"genre_ids"`
 	} `json:"tv_results"`
 }
 
@@ -120,27 +126,33 @@ func (c *RealTMDbClient) FindByIMDbID(ctx context.Context, imdbID string) (*TMDb
 	if len(resp.MovieResults) > 0 {
 		r := resp.MovieResults[0]
 		return &TMDbMatch{
-			MediaType:   "movie",
-			TMDbID:      r.ID,
-			Title:       r.Title,
-			ReleaseYear: yearFromDate(r.ReleaseDate),
-			PosterPath:  r.PosterPath,
-			Overview:    r.Overview,
-			VoteAverage: r.VoteAverage,
-			Genres:      resolveGenres(r.GenreIDs, c.movieGenres),
+			MediaType:        "movie",
+			TMDbID:           r.ID,
+			Title:            r.Title,
+			OriginalTitle:    r.OriginalTitle,
+			OriginalLanguage: r.OriginalLanguage,
+			ReleaseYear:      yearFromDate(r.ReleaseDate),
+			PosterPath:       r.PosterPath,
+			Overview:         r.Overview,
+			VoteAverage:      r.VoteAverage,
+			VoteCount:        r.VoteCount,
+			Genres:           resolveGenres(r.GenreIDs, c.movieGenres),
 		}, nil
 	}
 	if len(resp.TVResults) > 0 {
 		r := resp.TVResults[0]
 		return &TMDbMatch{
-			MediaType:   "tv",
-			TMDbID:      r.ID,
-			Title:       r.Name,
-			ReleaseYear: yearFromDate(r.FirstAirDate),
-			PosterPath:  r.PosterPath,
-			Overview:    r.Overview,
-			VoteAverage: r.VoteAverage,
-			Genres:      resolveGenres(r.GenreIDs, c.tvGenres),
+			MediaType:        "tv",
+			TMDbID:           r.ID,
+			Title:            r.Name,
+			OriginalTitle:    r.OriginalName,
+			OriginalLanguage: r.OriginalLanguage,
+			ReleaseYear:      yearFromDate(r.FirstAirDate),
+			PosterPath:       r.PosterPath,
+			Overview:         r.Overview,
+			VoteAverage:      r.VoteAverage,
+			VoteCount:        r.VoteCount,
+			Genres:           resolveGenres(r.GenreIDs, c.tvGenres),
 		}, nil
 	}
 	return nil, ErrTMDbNotFound

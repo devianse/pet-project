@@ -1418,7 +1418,7 @@ export default function WatchlistPage() {
     <Stack gap={5}>
       <h1 className="text-2xl font-black text-ink">Watchlist</h1>
       {error && (
-        <p className="font-bold text-[var(--on-accent)] bg-orange rounded-xl px-3 py-2 self-start">
+        <p className="font-bold text-(--on-accent) bg-orange rounded-xl px-3 py-2 self-start">
           {error}
         </p>
       )}
@@ -1466,7 +1466,7 @@ export default function WatchlistPage() {
                     <Row gap={2}>
                       <span className="font-black text-ink">{item.title}</span>
                       {item.release_year && <span className="text-muted">({item.release_year})</span>}
-                      <span className="text-xs font-black uppercase px-2 py-1 rounded-full bg-blue text-[var(--on-accent)]">
+                      <span className="text-xs font-black uppercase px-2 py-1 rounded-full bg-blue text-(--on-accent)">
                         {item.media_type === 'tv' ? 'TV' : 'Movie'}
                       </span>
                     </Row>

@@ -38,14 +38,17 @@ func setupStore(t *testing.T) *Store {
 
 func testMatch() *TMDbMatch {
 	return &TMDbMatch{
-		MediaType:   "movie",
-		TMDbID:      278,
-		Title:       "The Shawshank Redemption",
-		ReleaseYear: "1994",
-		PosterPath:  "/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg",
-		Overview:    "Framed in the 1940s...",
-		VoteAverage: 8.7,
-		Genres:      "Drama, Crime",
+		MediaType:        "movie",
+		TMDbID:           278,
+		Title:            "The Shawshank Redemption",
+		OriginalTitle:    "The Shawshank Redemption",
+		OriginalLanguage: "en",
+		ReleaseYear:      "1994",
+		PosterPath:       "/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg",
+		Overview:         "Framed in the 1940s...",
+		VoteAverage:      8.7,
+		VoteCount:        27000,
+		Genres:           "Drama, Crime",
 	}
 }
 

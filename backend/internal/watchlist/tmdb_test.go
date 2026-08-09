@@ -34,10 +34,13 @@ func TestRealTMDbClient_FindByIMDbID_MovieMatch(t *testing.T) {
 		"movie_results": [{
 			"id": 278,
 			"title": "The Shawshank Redemption",
+			"original_title": "The Shawshank Redemption",
+			"original_language": "en",
 			"release_date": "1994-09-23",
 			"poster_path": "/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg",
 			"overview": "Framed in the 1940s...",
 			"vote_average": 8.7,
+			"vote_count": 27000,
 			"genre_ids": [18, 80]
 		}],
 		"tv_results": []
@@ -64,6 +67,12 @@ func TestRealTMDbClient_FindByIMDbID_MovieMatch(t *testing.T) {
 	if match.Genres != "Drama, Crime" {
 		t.Fatalf("expected genres 'Drama, Crime', got %q", match.Genres)
 	}
+	if match.OriginalTitle != "The Shawshank Redemption" || match.OriginalLanguage != "en" {
+		t.Fatalf("unexpected original title/language: %q / %q", match.OriginalTitle, match.OriginalLanguage)
+	}
+	if match.VoteCount != 27000 {
+		t.Fatalf("expected vote count 27000, got %d", match.VoteCount)
+	}
 }
 
 func TestRealTMDbClient_FindByIMDbID_TVMatch(t *testing.T) {
@@ -72,10 +81,13 @@ func TestRealTMDbClient_FindByIMDbID_TVMatch(t *testing.T) {
 		"tv_results": [{
 			"id": 1399,
 			"name": "Game of Thrones",
+			"original_name": "Game of Thrones",
+			"original_language": "en",
 			"first_air_date": "2011-04-17",
 			"poster_path": "/u3bZgnGQ9T01sWNhyveQz0wH0Hl.jpg",
 			"overview": "Seven noble families fight...",
 			"vote_average": 8.4,
+			"vote_count": 22000,
 			"genre_ids": [10765]
 		}]
 	}`)
@@ -97,6 +109,12 @@ func TestRealTMDbClient_FindByIMDbID_TVMatch(t *testing.T) {
 	}
 	if match.Genres != "Sci-Fi & Fantasy" {
 		t.Fatalf("expected genres 'Sci-Fi & Fantasy', got %q", match.Genres)
+	}
+	if match.OriginalTitle != "Game of Thrones" || match.OriginalLanguage != "en" {
+		t.Fatalf("unexpected original title/language: %q / %q", match.OriginalTitle, match.OriginalLanguage)
+	}
+	if match.VoteCount != 22000 {
+		t.Fatalf("expected vote count 22000, got %d", match.VoteCount)
 	}
 }
 

@@ -381,7 +381,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="flex min-h-screen flex-col md:flex-row bg-bg text-ink">
       <nav
         aria-label="Primary"
-        className="flex flex-row items-center gap-2 overflow-x-auto p-3 md:flex-col md:items-stretch md:gap-3 md:overflow-visible md:w-[220px] md:shrink-0 md:p-6 bg-surface"
+        className="flex flex-row items-center gap-2 overflow-x-auto p-3 md:flex-col md:items-stretch md:gap-3 md:overflow-visible md:w-55 md:shrink-0 md:p-6 bg-surface"
       >
         <div className="hidden md:block px-2 pb-2 font-black text-lg text-ink">
           pet-projects
@@ -400,7 +400,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="hidden md:block flex-1" />
         <ThemeToggle />
       </nav>
-      <main className="flex-1 min-w-0 p-4 md:p-8 2xl:mx-auto 2xl:w-full 2xl:max-w-[1400px]">
+      <main className="flex-1 min-w-0 p-4 md:p-8 2xl:mx-auto 2xl:w-full 2xl:max-w-350">
         {children}
       </main>
     </div>
@@ -551,7 +551,7 @@ export default function NotesPage() {
     <Stack gap={5}>
       <h1 className="text-2xl font-black text-ink">Notes</h1>
       {error && (
-        <p className="font-bold text-[var(--on-accent)] bg-orange rounded-xl px-3 py-2 self-start">
+        <p className="font-bold text-(--on-accent) bg-orange rounded-xl px-3 py-2 self-start">
           {error}
         </p>
       )}
