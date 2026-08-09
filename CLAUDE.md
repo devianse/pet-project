@@ -27,6 +27,12 @@ terminals simultaneously, which README explains in detail.
 
 ## Conventions
 
+- **`@/*` path alias**: resolves to `frontend/src/*` (set up in
+  `tsconfig.app.json` and `vite.config.ts`). Use it for imports rather
+  than relative paths, especially across `frontend/src/components/pouf/`.
+- **`frontend/src/components/pouf/` is off-limits for manual edits** —
+  it's vendored/CLI-managed (see README's "Layout" section). Regenerate
+  or add to it via the shadcn CLI, don't hand-edit.
 - **Never commit without being asked.** Staging/committing is the user's
   call, every time — not implied by "this looks done."
 - **Env vars**: each app has a `.env.example` (checked in) and `.env`

@@ -1,5 +1,8 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -8,9 +11,15 @@ export default defineConfig(({ mode }) => {
   // import.meta.env is. '' as the third arg loads all vars, not just
   // VITE_-prefixed ones (fine here since nothing here ships to the browser).
   const env = loadEnv(mode, process.cwd(), '')
+  const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
   return {
-    plugins: [react()],
+    plugins: [react(), tailwindcss()],
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './src'),
+      },
+    },
     server: {
       port: Number(env.FRONTEND_PORT) || 3000,
       // Mirrors what Caddy will do in production: anything under /api goes

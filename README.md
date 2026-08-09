@@ -17,6 +17,11 @@ Two independent apps, each managing its own dependencies (`go.mod`,
 `package.json`) in its own subfolder — no monorepo tooling needed at this
 size.
 
+`frontend/src/components/pouf/` is vendored, CLI-managed code pulled from
+the 1st-Pouf design-system registry — not hand-authored, don't edit it
+directly (the next CLI run would silently overwrite manual changes). Add
+to it with `npx shadcn@latest add https://1st-pouf.worksonmy.dev/r/<name>.json`.
+
 ## Running locally
 
 `make dev-backend` and `make dev-frontend` each start a long-running,

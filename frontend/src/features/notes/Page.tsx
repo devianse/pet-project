@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react'
 import { createNotes, deleteNote, getNotes, type Note } from '../../shared/api'
+import { Card, RowCard } from '@/components/pouf/surface'
+import { Field, Input } from '@/components/pouf/Input'
+import { Button, IconButton } from '@/components/pouf/Button'
+import { Icon } from '@/components/pouf/Icon'
+import { Stack, Row } from '@/components/pouf/layout'
 
 // Saved notes come from the server on mount. Staged notes are typed but
 // not yet saved — they live only in this component's state until "Save"
@@ -50,35 +55,75 @@ export default function NotesPage() {
   }
 
   return (
-    <div>
-      <h1>Notes</h1>
-      {error && <p>{error}</p>}
+    <Stack gap={5}>
+      <h1 className="text-2xl font-black text-ink">Notes</h1>
+      {error && (
+        <p className="font-bold text-[var(--on-accent)] bg-orange rounded-xl px-3 py-2 self-start">
+          {error}
+        </p>
+      )}
 
-      <input
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        placeholder="New note"
-      />
-      <button onClick={addToStaged}>Add</button>
+      <Card>
+        <Stack gap={3}>
+          <Field label="New note">
+            {(id, describedBy) => (
+              <Input
+                id={id}
+                describedBy={describedBy}
+                value={draft}
+                onChange={setDraft}
+                placeholder="What do you want to remember?"
+              />
+            )}
+          </Field>
+          <Row justify="end">
+            <Button onClick={addToStaged} tone="purple">
+              <Icon name="add" /> Add
+            </Button>
+          </Row>
+        </Stack>
+      </Card>
 
       {staged.length > 0 && (
-        <ul>
-          {staged.map((content, i) => (
-            <li key={i}>
-              {content} <button onClick={() => removeStaged(i)}>Remove</button>
-            </li>
-          ))}
-        </ul>
+        <Card variant="tight">
+          <Stack gap={2}>
+            {staged.map((content, i) => (
+              <RowCard key={i}>
+                <Row justify="between">
+                  <span>{content}</span>
+                  <IconButton
+                    variant="quiet"
+                    size="sm"
+                    onClick={() => removeStaged(i)}
+                    label={`Remove note: ${content}`}
+                    icon={<Icon name="remove" />}
+                  />
+                </Row>
+              </RowCard>
+            ))}
+            <Button onClick={save} tone="mint" block>
+              Save
+            </Button>
+          </Stack>
+        </Card>
       )}
-      {staged.length > 0 && <button onClick={save}>Save</button>}
 
-      <ul>
+      <Stack gap={2}>
         {notes.map((note) => (
-          <li key={note.id}>
-            {note.content} <button onClick={() => remove(note.id)}>Remove</button>
-          </li>
+          <RowCard key={note.id}>
+            <Row justify="between">
+              <span>{note.content}</span>
+              <IconButton
+                variant="quiet"
+                size="sm"
+                onClick={() => remove(note.id)}
+                label={`Remove note: ${note.content}`}
+                icon={<Icon name="remove" />}
+              />
+            </Row>
+          </RowCard>
         ))}
-      </ul>
-    </div>
+      </Stack>
+    </Stack>
   )
 }
