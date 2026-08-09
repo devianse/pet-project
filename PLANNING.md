@@ -30,20 +30,34 @@ matches the shell-first order above one-for-one:
 3. **Design system** (done) — adopted 1st-Pouf (shadcn registry) as the
    visual identity for the shell + Notes, rather than hand-rolling
    tokens. See `docs/superpowers/specs/2026-08-09-design-system.md`.
-4. **Pre-deployment security hardening** (in progress) — Caddy/Postgres
+4. **Pre-deployment security hardening** (done) — Caddy/Postgres
    infra config, backend timeout/body-size hardening, basic-auth stopgap
-   ahead of real JWT auth, manual dependency/secret scans. Needed now
+   ahead of real JWT auth, manual dependency/secret scans. Needed
    because step 6 below deploys without phase-2 auth existing yet. See
    `docs/superpowers/specs/2026-08-09-pre-deployment-security-design.md`.
-5. **Movie/TV Sharing List** (in progress) — another pre-phase-3 detour,
+5. **Movie/TV Sharing List** (done) — another pre-phase-3 detour,
    same pattern as Notes: a shareable watchlist, paste an IMDb link, get
    a preview card (title, description, poster image) resolved via TMDb,
    mark items as viewed/expand for detail. See
    `docs/superpowers/specs/2026-08-09-movie-tv-sharing-list-design.md`
    and `docs/superpowers/plans/2026-08-09-movie-tv-sharing-list.md`.
-6. **First VPS deployment attempt** — see "Deployment target" below.
-   Happens once step 5 lands, still without phase-2 auth (the
-   security-hardening pass in step 4 is what makes that acceptable).
+6. **First VPS deployment attempt** (done, 2026-08-09) — live at
+   `https://mikelab.dev`, domain bought on reg.ru, deployed on a Cloudzy
+   Frankfurt VPS (1 vCPU/2GB/60GB, hourly billing as a ~3-week trial —
+   see "Deployment target" below for the planned move to Timeweb once
+   that runs out). Server hardened first (non-root sudo user, root SSH
+   disabled, password auth disabled, SSH moved off port 22, `ufw`
+   deny-by-default with only SSH/80/443 open), then Docker + Compose
+   installed, repo cloned, production `infra/.env` filled in (fresh
+   Postgres password, real TMDb token, Caddy basic-auth hash), DNS A
+   record pointed at the VPS, `docker compose up -d --build`. Caddy
+   obtained a real Let's Encrypt cert automatically, all 3 containers
+   healthy on first boot. Full step-by-step in
+   `infra/DEPLOYMENT_RUNBOOK.local.md` — written to make the Timeweb move a
+   checklist, not a from-scratch redo. One real bug caught and fixed
+   during this pass: `infra/docker-compose.yml` wasn't passing
+   `TMDB_READ_ACCESS_TOKEN` into the backend container at all (backend
+   exits on startup without it) — added alongside this deployment.
 7. **Phase 2** (auth, WebSockets) and the rest of phase 3 (Family
    Shopping List, then Image Processing) resume after that, order
    unchanged from the sections below.
@@ -74,7 +88,13 @@ Russia-based payment friction with most Western PaaS (Fly.io/Railway/Render all 
 | Timeweb Cloud | Entry | 2 vCPU @ 3.3GHz, 2GB RAM, 40GB NVMe, 1Gbps | 800₽/mo (~$8-9) | Russian provider, domestic card/SBP payment, Moscow/SPb regions — low latency, simplest payment path from Russia |
 | Cloudzy | Advanced | 1 vCPU @ 4.2GHz, 2GB RAM, 60GB NVMe, 3TB transfer | $7.48/mo (50%-off intro rate; $14.95 regular) | Accepts crypto (BTC/ETH/USDT/LTC) + card + PayPal — sidesteps the card-restriction problem differently than Timeweb; 13 global regions, latency from Russia unverified; intro pricing won't last at renewal |
 
-Both are viable "barebones" options at this scale (2GB RAM comfortably runs all 3 containers). **Decided: Cloudzy** — crypto/card/PayPal payment path preferred over Timeweb's domestic-card route; table above kept as the comparison record. A domain name (needed for Caddy's automatic HTTPS) is a separate purchase either way, from neither of these.
+Both are viable "barebones" options at this scale (2GB RAM comfortably runs all 3 containers). **Originally decided: Cloudzy** — crypto/card/PayPal payment path preferred over Timeweb's domestic-card route; table above kept as the comparison record. A domain name (needed for Caddy's automatic HTTPS) is a separate purchase either way, from neither of these.
+
+**Revised during actual provisioning (2026-08-09)**: crypto top-up into Cloudzy carries a real cost the original comparison missed — ~12% conversion + a flat ~$3.5 fee per payment — which erodes Cloudzy's price edge once that's counted. Timeweb also turned out to offer a Netherlands region (not just Moscow/SPb), which gets the same low-latency-from-Russia benefit as Cloudzy's Frankfurt option while keeping Timeweb's fee-free domestic card/SBP payment — collapsing the tradeoff the original table was built around.
+
+**Current plan**: the first deployment (see build-order step 6 above) runs on **Cloudzy, Frankfurt, hourly billing**, deliberately treated as a ~3-week paid trial funded by an already-deposited $10 balance — not the permanent home. Once that runs out, **move to Timeweb (Netherlands)** for the ongoing recurring hosting, using `infra/DEPLOYMENT_RUNBOOK.local.md` as the checklist (same Docker Compose stack, so it's a redo of the OS-level steps — hardening, Docker install — plus a deliberate Postgres `pg_dump`/restore and a DNS cutover, not a from-scratch rebuild).
+
+Domain: **`mikelab.dev`**, bought on reg.ru, 1-year registration (chose 1-year over 2-year prepay since renewal is low-friction and 2-year prepay only insures against a price hike that isn't guaranteed).
 
 ## First project to plug in: Family Shopping List — comes later, after the shell exists
 
