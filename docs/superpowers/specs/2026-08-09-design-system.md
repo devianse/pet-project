@@ -41,9 +41,15 @@ falls genuinely outside what 1st-Pouf's components/blocks cover.
   path aliases, `src/components/ui/`
 - **1st-Pouf** components/blocks pulled in via its registry URL on top of
   the shadcn base
-- **lucide-react** for icons (1st-Pouf's default, tree-shaken per-icon
-  import) — needed regardless per an explicit requirement (icons for
-  sidebar nav items and Notes page actions)
+- **Icons via 1st-Pouf's own `Icon` component** (`registry/pouf/Icon.tsx`),
+  which wraps `@tabler/icons-react` behind a named-role vocabulary (`home`,
+  `cart`, `add`, `remove`, `photo`, `log`, etc. — not `lucide-react`, a
+  correction from earlier design discussion) — needed regardless per an
+  explicit requirement (icons for sidebar nav items and Notes page
+  actions). Any icon-accepting prop also takes a raw React element, so a
+  role not in their vocabulary (e.g. a moon icon for the dark-mode toggle)
+  can still come from `@tabler/icons-react` directly, already a
+  transitive dependency
 - Existing `index.css` custom-property token set (`--text`, `--bg`,
   `--accent`, etc.) is **replaced**, not layered — 1st-Pouf ships its own
   token set via `pouf.css`; keeping both would be two competing sources
@@ -53,19 +59,25 @@ falls genuinely outside what 1st-Pouf's components/blocks cover.
 
 - **Sidebar shell**: replaces the current horizontal `<nav>` in `App.tsx`
   with a persistent left sidebar (nav links: Home, Shopping List, Image
-  Processing, Notes; one lucide icon per link), sourced from 1st-Pouf's
-  dashboard app-shell block. Exact block slug confirmed at implementation
-  time from their registry listing.
+  Processing, Notes; one icon per link via 1st-Pouf's `Icon`/`NavLink`
+  components). Hand-assembled from 1st-Pouf's `layout` primitives
+  (`Stack`/`Row`) and `NavLink`, rather than their prebuilt `dashboard`
+  block — that block pulls in `BottomNav`, which adds a Radix-Dialog-backed
+  "Menu" overflow sheet for mobile. With only four nav items and an
+  explicit "no hamburger, no overflow menu, always visible" requirement,
+  that block's mobile pattern doesn't fit; a small custom shell composed
+  from their lower-level primitives does, without dragging in
+  `@radix-ui/react-dialog` for a sheet this project doesn't want.
 - **Layout container**: current `#root` (fixed `1126px` max-width,
-  centered, single-column) restructured to a full-width flex/grid shell
+  centered, single-column) restructured to a full-width flex shell
   (sidebar + main content area). Routing itself (`react-router-dom`)
   is unaffected — only what wraps the routes changes.
 - **Notes page restyle** (the one real feature): staged-list and
-  saved-list become 1st-Pouf `List`/`Card`-style components instead of
-  raw `<ul><li>`; add-input and Save/Remove become 1st-Pouf
-  `Button`/`Input` components, with icons on the action buttons. Visual
-  only — no change to staging/batch-save/delete behavior or to
-  `shared/api.ts`.
+  saved-list become 1st-Pouf `Card`/`RowCard` components (from
+  `surface.tsx`) instead of raw `<ul><li>`; add-input and Save/Remove
+  become 1st-Pouf `Field`/`Input`/`Button` components, with icons (`add`,
+  `remove` roles) on the action buttons. Visual only — no change to
+  staging/batch-save/delete behavior or to `shared/api.ts`.
 - **Out of scope for this pass**: Home, Shopping List, and Image
   Processing pages stay in their current plain styling — they're
   placeholders with no real content yet, not worth restyling twice.
@@ -93,8 +105,10 @@ pattern:
   `index.html`'s `<head>`, run before React mounts, reads `localStorage`
   and sets `class="dark"` (or omits it) on `<html>` before first paint.
 - **Toggle UI**: 1st-Pouf ships tokens but no switcher component, so this
-  is custom-built — a sun/moon lucide icon button, styled with 1st-Pouf's
-  existing `Button` primitive, placed in the sidebar.
+  is custom-built — a sun/moon icon button (`Icon name="sun"` for one
+  state, a raw `IconMoon` from `@tabler/icons-react` for the other, since
+  "moon" isn't in 1st-Pouf's named-role vocabulary), styled with
+  1st-Pouf's existing `Button` primitive, placed in the sidebar.
 
 ## Responsiveness
 
