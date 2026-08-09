@@ -1,6 +1,8 @@
-// Phase 1 scaffold, now with the Notes feature wired in as a deliberate
-// detour ahead of the shell-first plan (see
-// docs/superpowers/specs/2026-08-08-notes-design.md). Still no auth.
+// Phase 1 scaffold, now with the Notes and Watchlist features wired in as
+// deliberate detours ahead of the shell-first plan (see
+// docs/superpowers/specs/2026-08-08-notes-design.md and
+// docs/superpowers/specs/2026-08-09-movie-tv-sharing-list-design.md).
+// Still no auth.
 package main
 
 import (
@@ -12,6 +14,7 @@ import (
 
 	"github.com/devianse/pet-project/backend/internal/db"
 	"github.com/devianse/pet-project/backend/internal/notes"
+	"github.com/devianse/pet-project/backend/internal/watchlist"
 	"github.com/joho/godotenv"
 )
 
@@ -46,11 +49,33 @@ func main() {
 	}
 	notesHandler := notes.NewHandler(notesStore)
 
+	tmdbToken := os.Getenv("TMDB_READ_ACCESS_TOKEN")
+	if tmdbToken == "" {
+		logger.Error("TMDB_READ_ACCESS_TOKEN is not set")
+		os.Exit(1)
+	}
+	tmdbClient, err := watchlist.NewRealTMDbClient(context.Background(), tmdbToken)
+	if err != nil {
+		logger.Error("failed to initialize tmdb client", "error", err)
+		os.Exit(1)
+	}
+
+	watchlistStore := watchlist.NewStore(conn)
+	if err := watchlistStore.EnsureSchema(context.Background()); err != nil {
+		logger.Error("failed to ensure watchlist schema", "error", err)
+		os.Exit(1)
+	}
+	watchlistHandler := watchlist.NewHandler(watchlistStore, tmdbClient)
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", handleHealth)
 	mux.HandleFunc("GET /api/notes", notesHandler.List)
 	mux.HandleFunc("POST /api/notes", notesHandler.Create)
 	mux.HandleFunc("DELETE /api/notes/{id}", notesHandler.Delete)
+	mux.HandleFunc("GET /api/watchlist", watchlistHandler.List)
+	mux.HandleFunc("POST /api/watchlist", watchlistHandler.Create)
+	mux.HandleFunc("PATCH /api/watchlist/{id}", watchlistHandler.SetViewed)
+	mux.HandleFunc("DELETE /api/watchlist/{id}", watchlistHandler.Delete)
 
 	port := os.Getenv("PORT")
 	if port == "" {
