@@ -25,6 +25,9 @@
 /.claude/worktrees/
 /.superpowers/
 
+# --- Personal reference (not project docs) ---
+CHEATSHEET.local.md
+
 # --- Editor / OS cruft ---
 .DS_Store
 .vscode/*
