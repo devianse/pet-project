@@ -1,0 +1,15 @@
+# Applies to infra/Dockerfile's build context (repo root) — keeps env
+# files, git history, and local build/dependency artifacts out of the
+# Caddy image's build stage, even though the multi-stage build only
+# copies the final frontend/dist forward.
+.git/
+**/.env
+**/.env.*
+!**/.env.example
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+backend/bin/
+backend/api
+.superpowers/
+.claude/worktrees/

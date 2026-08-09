@@ -66,5 +66,55 @@ as needed.
 ```
 make build-backend    # go build ./...
 make build-frontend   # tsc -b && vite build
-make lint-frontend     # oxlint
+make lint-frontend    # oxlint
+make audit-frontend   # npm audit — known-vulnerability check on JS deps
+make audit-backend    # govulncheck ./... — known-vulnerability check on Go deps
+make scan-secrets     # gitleaks detect — scans git history for committed secrets
 ```
+
+`audit-backend` needs `govulncheck` installed once:
+`go install golang.org/x/vuln/cmd/govulncheck@latest`
+
+`scan-secrets` needs `gitleaks` installed once — it's a standalone binary,
+not a project dependency: `brew install gitleaks`, or download a release
+from [github.com/gitleaks/gitleaks](https://github.com/gitleaks/gitleaks/releases).
+
+Per `CLAUDE.md`'s convention, a PR isn't considered ready until all three
+scans pass clean.
+
+## Deploying
+
+The full stack (`infra/docker-compose.yml`) is Caddy + backend + Postgres,
+with only Caddy reachable from outside the container network — see
+`docs/superpowers/specs/2026-08-09-pre-deployment-security-design.md` for
+the reasoning. Steps to provision a fresh VPS:
+
+1. **SSH: key-only login.** Generate a key pair locally if you don't have
+   one (`ssh-keygen -t ed25519`), get the public key onto the VPS (many
+   providers accept it at provisioning time; otherwise `ssh-copy-id`
+   once using the initial password), then in `/etc/ssh/sshd_config` set
+   `PasswordAuthentication no` and `PubkeyAuthentication yes`, and
+   `systemctl restart sshd`. Verify a *second* terminal can still log in
+   with the key before closing the first — don't skip this check.
+2. **Firewall.** `ufw allow 22 && ufw allow 80 && ufw allow 443 && ufw enable`
+   — deny everything else by default. Note: this covers the SSH port and
+   anything the host itself listens on, but Docker inserts its own
+   `iptables` rules ahead of `ufw`'s — a container that publishes a host
+   port is reachable regardless of `ufw`. That's fine here (only 80/443
+   are published, which `ufw` already allows), but don't assume `ufw`
+   alone would block a future `ports:` addition to `docker-compose.yml`.
+3. **fail2ban.** `apt install fail2ban` (or equivalent), watching sshd for
+   repeated failed login attempts.
+4. **Deploy.** Clone the whole repo onto the VPS (not just `infra/` —
+   `infra/docker-compose.yml`'s builds need `frontend/` and `backend/` as
+   build context too), set real values in `infra/.env` (a real `DOMAIN`,
+   a freshly generated `BASIC_AUTH_PASSWORD_HASH`, real Postgres
+   credentials — never the `.env.example` placeholders), then `cd infra
+   && docker compose up --build -d`.
+5. **DNS.** Point the domain's A record at the VPS's public IP before
+   step 4's first request — Caddy requests its TLS certificate on first
+   contact and needs the domain already resolving.
+
+Basic auth (site-wide, one shared credential pair) gates the whole app
+until phase 2's real JWT auth replaces it — see `PLANNING.md`'s Security
+TODO section.
