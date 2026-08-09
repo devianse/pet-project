@@ -97,14 +97,20 @@ the reasoning. Steps to provision a fresh VPS:
    `systemctl restart sshd`. Verify a *second* terminal can still log in
    with the key before closing the first — don't skip this check.
 2. **Firewall.** `ufw allow 22 && ufw allow 80 && ufw allow 443 && ufw enable`
-   — deny everything else by default.
+   — deny everything else by default. Note: this covers the SSH port and
+   anything the host itself listens on, but Docker inserts its own
+   `iptables` rules ahead of `ufw`'s — a container that publishes a host
+   port is reachable regardless of `ufw`. That's fine here (only 80/443
+   are published, which `ufw` already allows), but don't assume `ufw`
+   alone would block a future `ports:` addition to `docker-compose.yml`.
 3. **fail2ban.** `apt install fail2ban` (or equivalent), watching sshd for
    repeated failed login attempts.
-4. **Deploy.** Copy `infra/` to the VPS (or clone the repo there), set
-   real values in `infra/.env` (a real `DOMAIN`, a freshly generated
-   `BASIC_AUTH_PASSWORD_HASH`, real Postgres credentials — never the
-   `.env.example` placeholders), then `cd infra && docker compose up
-   --build -d`.
+4. **Deploy.** Clone the whole repo onto the VPS (not just `infra/` —
+   `infra/docker-compose.yml`'s builds need `frontend/` and `backend/` as
+   build context too), set real values in `infra/.env` (a real `DOMAIN`,
+   a freshly generated `BASIC_AUTH_PASSWORD_HASH`, real Postgres
+   credentials — never the `.env.example` placeholders), then `cd infra
+   && docker compose up --build -d`.
 5. **DNS.** Point the domain's A record at the VPS's public IP before
    step 4's first request — Caddy requests its TLS certificate on first
    contact and needs the domain already resolving.
