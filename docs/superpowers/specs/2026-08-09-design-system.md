@@ -96,6 +96,29 @@ pattern:
   is custom-built — a sun/moon lucide icon button, styled with 1st-Pouf's
   existing `Button` primitive, placed in the sidebar.
 
+## Responsiveness
+
+Two breakpoints (Tailwind's default scale, no custom pixel values), kept
+deliberately simple — this is meant to actually be used on a phone, and
+"as simple as possible" was an explicit instruction:
+
+- **Mobile** (`< md`, below 768px): the sidebar nav reflows into a plain
+  horizontal bar (icons + labels), always visible — no off-canvas drawer,
+  no hamburger toggle, no open/close state or animation. Same nav
+  markup, just a CSS layout-direction change (`flex-col` → `flex-row`)
+  at the breakpoint.
+- **Desktop / large monitors** (`≥ 2xl`, 1536px+): the content column
+  (not the sidebar, which stays fixed-width) gets a max-width cap and
+  re-centers, so content doesn't stretch edge-to-edge on a 21"+ monitor —
+  same idea as the current `#root`'s `1126px` cap, scoped to the content
+  area now that a sidebar occupies the left edge.
+- **In between** (`md`–`2xl`): sidebar visible at fixed width, content
+  fills the remaining space fluidly — Tailwind/1st-Pouf's normal
+  behavior, no special-casing.
+
+No JS-driven responsive state anywhere in this design — both breakpoints
+are pure CSS reflow.
+
 ## Testing / verification
 
 No new backend logic or data flow — this is a pure UI/presentation
