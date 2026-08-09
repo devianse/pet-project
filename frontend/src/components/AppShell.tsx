@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { NavLink, type LinkComponent } from './pouf/NavLink'
-import type { IconName } from './pouf/Icon'
+import { NavLink, type LinkComponent } from '@/components/pouf/NavLink'
+import type { IconName } from '@/components/pouf/Icon'
 import { ThemeToggle } from './ThemeToggle'
 
 // pouf's NavLink takes a router-agnostic `href` prop; this adapts it to
@@ -31,7 +31,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="flex min-h-screen flex-col md:flex-row bg-bg text-ink">
       <nav
         aria-label="Primary"
-        className="flex flex-row items-center gap-2 overflow-x-auto p-3 md:flex-col md:items-stretch md:gap-3 md:overflow-visible md:w-[220px] md:shrink-0 md:p-6 bg-surface"
+        className="flex flex-row items-center gap-2 overflow-x-auto p-3 md:flex-col md:items-stretch md:gap-3 md:overflow-visible md:w-[220px] md:shrink-0 md:p-6 bg-surface [&>a]:shrink-0 [&>a]:whitespace-nowrap"
       >
         <div className="hidden md:block px-2 pb-2 font-black text-lg text-ink">
           pet-projects

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { createNotes, deleteNote, getNotes, type Note } from '../../shared/api'
 import { Card, RowCard } from '@/components/pouf/surface'
 import { Field, Input } from '@/components/pouf/Input'
-import { Button } from '@/components/pouf/Button'
+import { Button, IconButton } from '@/components/pouf/Button'
 import { Icon } from '@/components/pouf/Icon'
 import { Stack, Row } from '@/components/pouf/layout'
 
@@ -91,14 +91,13 @@ export default function NotesPage() {
               <RowCard key={i}>
                 <Row justify="between">
                   <span>{content}</span>
-                  <Button
+                  <IconButton
                     variant="quiet"
                     size="sm"
                     onClick={() => removeStaged(i)}
-                    label="Remove"
-                  >
-                    <Icon name="remove" />
-                  </Button>
+                    label={`Remove note: ${content}`}
+                    icon={<Icon name="remove" />}
+                  />
                 </Row>
               </RowCard>
             ))}
@@ -114,14 +113,13 @@ export default function NotesPage() {
           <RowCard key={note.id}>
             <Row justify="between">
               <span>{note.content}</span>
-              <Button
+              <IconButton
                 variant="quiet"
                 size="sm"
                 onClick={() => remove(note.id)}
-                label="Remove"
-              >
-                <Icon name="remove" />
-              </Button>
+                label={`Remove note: ${note.content}`}
+                icon={<Icon name="remove" />}
+              />
             </Row>
           </RowCard>
         ))}

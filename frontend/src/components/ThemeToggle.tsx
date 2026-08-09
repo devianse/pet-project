@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { IconMoon } from '@tabler/icons-react'
-import { Button } from './pouf/Button'
-import { Icon } from './pouf/Icon'
+import { IconButton } from '@/components/pouf/Button'
+import { Icon } from '@/components/pouf/Icon'
 
 function readIsDark(): boolean {
   return document.documentElement.classList.contains('dark')
@@ -17,18 +17,24 @@ export function ThemeToggle() {
   function toggle() {
     const next = !dark
     document.documentElement.classList.toggle('dark', next)
-    localStorage.setItem('theme', next ? 'dark' : 'light')
+    // Storage can throw in private/restricted browsing contexts (mirrors the
+    // try/catch already around the read in index.html's inline script) — the
+    // toggle must keep working in-memory/DOM even when persistence fails.
+    try {
+      localStorage.setItem('theme', next ? 'dark' : 'light')
+    } catch {
+      // ignore — persistence is a nice-to-have, not required for the toggle to work
+    }
     setDark(next)
   }
 
   return (
-    <Button
+    <IconButton
       variant="quiet"
       size="sm"
       onClick={toggle}
       label={dark ? 'Switch to light theme' : 'Switch to dark theme'}
-    >
-      {dark ? <IconMoon size={20} /> : <Icon name="sun" />}
-    </Button>
+      icon={dark ? <IconMoon size={20} color="currentColor" stroke={2.4} /> : <Icon name="sun" />}
+    />
   )
 }
