@@ -54,7 +54,8 @@ process shows up later.
 Env config: copy `.env.example` to `.env` in each app's folder and adjust
 as needed.
 
-- `backend/.env.example` — `PORT` the Go server listens on
+- `backend/.env.example` — `PORT` the Go server listens on,
+  `TMDB_READ_ACCESS_TOKEN` for the Watchlist feature's TMDb API calls
 - `frontend/.env.example` — `API_PROXY_TARGET` (where Vite's dev proxy
   forwards `/api` requests) and `FRONTEND_PORT` (what port Vite itself
   runs on, default 3000)

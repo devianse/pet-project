@@ -40,3 +40,60 @@ export async function deleteNote(id: number): Promise<void> {
     throw new Error(`failed to delete note: ${res.status}`)
   }
 }
+
+export type WatchlistItem = {
+  id: number
+  imdb_id: string
+  media_type: 'movie' | 'tv'
+  tmdb_id: number
+  title: string
+  original_title: string
+  original_language: string
+  release_year: string | null
+  poster_path: string | null
+  overview: string
+  vote_average: number
+  vote_count: number
+  genres: string
+  viewed: boolean
+  created_at: string
+}
+
+export async function getWatchlist(): Promise<WatchlistItem[]> {
+  const res = await fetch('/api/watchlist')
+  if (!res.ok) {
+    throw new Error(`failed to load watchlist: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function addToWatchlist(link: string): Promise<WatchlistItem> {
+  const res = await fetch('/api/watchlist', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ link }),
+  })
+  if (!res.ok) {
+    const message = await res.text()
+    throw new Error(message || `failed to add link: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function setWatchlistItemViewed(id: number, viewed: boolean): Promise<void> {
+  const res = await fetch(`/api/watchlist/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ viewed }),
+  })
+  if (!res.ok) {
+    throw new Error(`failed to update watchlist item: ${res.status}`)
+  }
+}
+
+export async function removeFromWatchlist(id: number): Promise<void> {
+  const res = await fetch(`/api/watchlist/${id}`, { method: 'DELETE' })
+  if (!res.ok) {
+    throw new Error(`failed to remove watchlist item: ${res.status}`)
+  }
+}

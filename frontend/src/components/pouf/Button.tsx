@@ -104,7 +104,7 @@ export function buttonClasses(
 function LoadingSpinner() {
   return (
     <span
-      className="size-[15px] rounded-[50%] border-[3px] border-solid border-[color-mix(in_srgb,currentColor_24%,transparent)] border-t-current [animation:pouf-spin_620ms_linear_infinite]"
+      className="size-3.75 rounded-[50%] border-[3px] border-solid border-[color-mix(in_srgb,currentColor_24%,transparent)] border-t-current animate-[pouf-spin_620ms_linear_infinite]"
       aria-hidden="true"
     />
   )

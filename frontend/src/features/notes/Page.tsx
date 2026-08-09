@@ -58,7 +58,7 @@ export default function NotesPage() {
     <Stack gap={5}>
       <h1 className="text-2xl font-black text-ink">Notes</h1>
       {error && (
-        <p className="font-bold text-[var(--on-accent)] bg-orange rounded-xl px-3 py-2 self-start">
+        <p className="font-bold text-(--on-accent) bg-orange rounded-xl px-3 py-2 self-start">
           {error}
         </p>
       )}
