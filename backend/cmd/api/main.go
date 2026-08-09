@@ -57,8 +57,9 @@ func main() {
 		port = "8080"
 	}
 	addr := ":" + port
+	srv := newServer(addr, maxBytesMiddleware(mux))
 	logger.Info("api listening", "addr", addr)
-	if err := http.ListenAndServe(addr, mux); err != nil {
+	if err := srv.ListenAndServe(); err != nil {
 		logger.Error("server failed", "error", err)
 		os.Exit(1)
 	}
