@@ -7,17 +7,20 @@ Check both before assuming a decision hasn't been made.
 
 ## Current phase
 
-Phase 1 (barebones scaffold) is done: Go API + React SPA wired end to end
-via Vite's dev proxy, env var config in place. Phase 2 (auth, WebSockets)
-has NOT started — don't assume either exists. Phase 3 (domain projects)
-is further out still. See `PLANNING.md`'s phase breakdown for the full
-picture.
+Phase 1 (barebones scaffold) is done. Phase 2 (auth, WebSockets) has NOT
+started — don't assume either exists. Several small features (Notes,
+design system, pre-deployment security hardening, an upcoming Movie
+Sharing list) have landed ahead of phase 2/3 as deliberate detours before
+a first VPS deployment attempt — see `PLANNING.md`'s "Actual build order
+so far" section for the current sequence, not just the original
+phase breakdown further down that file.
 
 ## Layout
 
-See `README.md`'s "Layout" section for the directory tree. `infra/` and
-`docs/` are deliberately not created yet — nothing to put in either until
-deployment/real docs are actually needed. Not an oversight.
+See `README.md`'s "Layout" section for the directory tree. `docs/`
+already holds design specs (`docs/superpowers/specs/`); `infra/` gets
+its first content (Caddyfile, docker-compose.yml) as part of the
+pre-deployment security hardening work.
 
 ## Commands
 
@@ -35,6 +38,10 @@ terminals simultaneously, which README explains in detail.
   or add to it via the shadcn CLI, don't hand-edit.
 - **Never commit without being asked.** Staging/committing is the user's
   call, every time — not implied by "this looks done."
+- **A PR isn't ready unless `npm audit` (frontend), `govulncheck ./...`
+  (backend), and `gitleaks detect --source . -v` all pass clean.** Run
+  by hand before proposing a PR as done — no CI enforces this yet. See
+  README's "Other commands" for install/usage of each.
 - **Env vars**: each app has a `.env.example` (checked in) and `.env`
   (gitignored, real values) — see README's "Env config" section for the
   actual var list. Backend loads its via `godotenv`; frontend's
