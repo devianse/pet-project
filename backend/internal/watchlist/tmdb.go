@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // ErrTMDbNotFound is returned by TMDbClient.FindByIMDbID when TMDb has
@@ -42,22 +44,27 @@ func NewRealTMDbClient(ctx context.Context, token string) (*RealTMDbClient, erro
 // httptest.Server instead of the real themoviedb.org.
 func newRealTMDbClient(ctx context.Context, baseURL, token string) (*RealTMDbClient, error) {
 	c := &RealTMDbClient{
-		httpClient: http.DefaultClient,
+		httpClient: &http.Client{Timeout: 10 * time.Second},
 		baseURL:    baseURL,
 		token:      token,
 	}
 
-	movieGenres, err := c.fetchGenreMap(ctx, "/genre/movie/list")
-	if err != nil {
-		return nil, fmt.Errorf("fetching movie genres: %w", err)
-	}
-	tvGenres, err := c.fetchGenreMap(ctx, "/genre/tv/list")
-	if err != nil {
-		return nil, fmt.Errorf("fetching tv genres: %w", err)
-	}
-	c.movieGenres = movieGenres
-	c.tvGenres = tvGenres
+	c.movieGenres = c.fetchGenreMapOrEmpty(ctx, "/genre/movie/list")
+	c.tvGenres = c.fetchGenreMapOrEmpty(ctx, "/genre/tv/list")
 	return c, nil
+}
+
+// fetchGenreMapOrEmpty fetches a genre id->name map, logging and falling
+// back to an empty map on failure. A TMDb outage during startup should
+// degrade the genres field on watchlist items, not take down the whole
+// server — Notes and /api/health don't depend on TMDb at all.
+func (c *RealTMDbClient) fetchGenreMapOrEmpty(ctx context.Context, path string) map[int]string {
+	m, err := c.fetchGenreMap(ctx, path)
+	if err != nil {
+		slog.Warn("fetching tmdb genre list, continuing with empty genre names", "path", path, "error", err)
+		return map[int]string{}
+	}
+	return m
 }
 
 type genreListResponse struct {

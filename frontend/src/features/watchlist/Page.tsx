@@ -165,12 +165,25 @@ export default function WatchlistPage() {
                       />
                     </Row>
                   </Row>
+                  <Row gap={3} align="center">
+                    <a
+                      href={`https://www.imdb.com/title/${item.imdb_id}/`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-bold underline text-ink"
+                    >
+                      IMDb
+                    </a>
+                    <Row gap={1} align="center">
+                      <Icon name="star" size="sm" />
+                      <span className="text-muted">{item.vote_average.toFixed(1)}</span>
+                    </Row>
+                    {item.genres && <span className="text-muted">{item.genres}</span>}
+                  </Row>
                   {expanded && (
-                    <Stack gap={1}>
+                    <div className="rounded-control bg-bg p-3">
                       <p className="text-ink">{item.overview}</p>
-                      {item.genres && <p className="text-muted">{item.genres}</p>}
-                      <p className="text-muted">TMDb rating: {item.vote_average.toFixed(1)}</p>
-                    </Stack>
+                    </div>
                   )}
                 </Stack>
               </Row>
@@ -180,7 +193,11 @@ export default function WatchlistPage() {
       </Stack>
 
       <p className="text-xs text-muted">
-        This product uses the TMDB API but is not endorsed or certified by TMDB.
+        This product uses the{' '}
+        <a href="https://www.themoviedb.org/" target="_blank" rel="noreferrer" className="underline">
+          TMDB
+        </a>{' '}
+        API but is not endorsed or certified by TMDB.
       </p>
     </Stack>
   )

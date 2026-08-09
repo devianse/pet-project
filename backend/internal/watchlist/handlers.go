@@ -9,7 +9,7 @@ import (
 	"strconv"
 )
 
-var imdbTitleURLPattern = regexp.MustCompile(`(?i)^https?://(www\.)?imdb\.com/title/(tt\d+)`)
+var imdbTitleURLPattern = regexp.MustCompile(`^(?i:https?://(www\.)?imdb\.com)/title/(tt\d+)`)
 
 // parseIMDbID extracts the tt-id from an IMDb title URL, e.g.
 // "https://www.imdb.com/title/tt0111161/" -> "tt0111161". Anything else

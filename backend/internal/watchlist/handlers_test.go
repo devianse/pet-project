@@ -30,6 +30,7 @@ func TestParseIMDbID(t *testing.T) {
 		{"valid", "https://www.imdb.com/title/tt0111161/", "tt0111161", false},
 		{"valid without www", "https://imdb.com/title/tt0111161", "tt0111161", false},
 		{"valid with query suffix", "https://www.imdb.com/title/tt0111161/?ref_=nv_sr_srsg_0", "tt0111161", false},
+		{"uppercase tt id is rejected", "https://www.imdb.com/title/TT0111161/", "", true},
 		{"wrong site", "https://www.kinopoisk.ru/film/326/", "", true},
 		{"not a url", "The Shawshank Redemption", "", true},
 		{"empty", "", "", true},
@@ -52,8 +53,9 @@ func TestParseIMDbID(t *testing.T) {
 }
 
 func TestHandler_Create_RejectsNonIMDbLink(t *testing.T) {
-	store := setupStore(t)
-	handler := NewHandler(store, &fakeTMDbClient{})
+	// nil store is safe here: Create returns 400 on the link-parse failure
+	// before ever calling the store, so this test doesn't need Postgres.
+	handler := NewHandler(nil, &fakeTMDbClient{})
 
 	body, _ := json.Marshal(createRequest{Link: "https://www.kinopoisk.ru/film/326/"})
 	req := httptest.NewRequest(http.MethodPost, "/api/watchlist", bytes.NewReader(body))
@@ -67,8 +69,9 @@ func TestHandler_Create_RejectsNonIMDbLink(t *testing.T) {
 }
 
 func TestHandler_Create_RejectsWhenTMDbHasNoMatch(t *testing.T) {
-	store := setupStore(t)
-	handler := NewHandler(store, &fakeTMDbClient{err: ErrTMDbNotFound})
+	// nil store is safe here: Create returns 400 on ErrTMDbNotFound before
+	// ever calling the store, so this test doesn't need Postgres.
+	handler := NewHandler(nil, &fakeTMDbClient{err: ErrTMDbNotFound})
 
 	body, _ := json.Marshal(createRequest{Link: "https://www.imdb.com/title/tt0000000/"})
 	req := httptest.NewRequest(http.MethodPost, "/api/watchlist", bytes.NewReader(body))
