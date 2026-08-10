@@ -186,6 +186,13 @@ Corrected framing from earlier in planning: OCR/photo parsing isn't a shopping-l
   final whole-branch review (with one fix wave) are all done and clean;
   the branch itself hasn't been merged to `main` or opened as a PR yet,
   by deliberate choice ("keep as-is" for now).
+- **Changing an existing user's role** — `cmd/createuser` only creates
+  new accounts; there's no way yet to promote/demote an existing one
+  (e.g. `user` → `admin`) short of editing the DB by hand. Noted while
+  seeding the first production admin account (2026-08-10 redeploy) as a
+  later addition, not urgent since `role` isn't enforced anywhere yet
+  (see the fine-grained-permissions item above) — revisit once role
+  actually gates something.
 
 ## Security TODO (deferred out of the pre-deployment hardening pass)
 
