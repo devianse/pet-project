@@ -23,6 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUnauthorizedHandler(() => setUser(null))
     getMe()
       .then(setUser)
+      .catch(() => setUser(null))
       .finally(() => setLoading(false))
     return () => setUnauthorizedHandler(null)
   }, [])

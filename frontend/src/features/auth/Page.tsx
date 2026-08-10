@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/shared/auth'
 import { Card } from '@/components/pouf/surface'
 import { Field, Input } from '@/components/pouf/Input'
@@ -9,13 +9,17 @@ import { Stack } from '@/components/pouf/layout'
 type LocationState = { from?: { pathname: string } }
 
 export default function LoginPage() {
-  const { login } = useAuth()
+  const { user, login } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  if (user) {
+    return <Navigate to="/" replace />
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
