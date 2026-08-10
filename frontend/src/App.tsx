@@ -1,30 +1,54 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import type { ReactNode } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import HomePage from './features/home/Page'
 import ShoppingListPage from './features/shopping-list/Page'
 import ImageProcessingPage from './features/image-processing/Page'
 import NotesPage from './features/notes/Page'
 import WatchlistPage from './features/watchlist/Page'
+import LoginPage from './features/auth/Page'
 import { AppShell } from './components/AppShell'
+import { AuthProvider, useAuth } from './shared/auth'
 
-// Phase 1 shell: nav + routing only. Auth-gating, layout polish, etc. are
-// phase 2 once there's something worth protecting. Notes and Watchlist
-// are phase-2/3 domain features pulled forward as deliberate detours —
-// see docs/superpowers/specs/2026-08-08-notes-design.md and
-// docs/superpowers/specs/2026-08-09-movie-tv-sharing-list-design.md. Nav
-// chrome comes from AppShell (Tailwind + 1st-Pouf) — see
-// docs/superpowers/specs/2026-08-09-design-system.md.
+// Whole app is gated behind login (per the auth design spec — "everything").
+// /login is the one route outside RequireAuth; everything else redirects
+// there, remembering where the visitor was headed via router state.
+function RequireAuth({ children }: { children: ReactNode }) {
+  const { user, loading } = useAuth()
+  const location = useLocation()
+
+  if (loading) {
+    return null
+  }
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location }} replace />
+  }
+  return <>{children}</>
+}
+
 export default function App() {
   return (
     <BrowserRouter>
-      <AppShell>
+      <AuthProvider>
         <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/shopping-list" element={<ShoppingListPage />} />
-          <Route path="/image-processing" element={<ImageProcessingPage />} />
-          <Route path="/notes" element={<NotesPage />} />
-          <Route path="/watchlist" element={<WatchlistPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route
+            path="/*"
+            element={
+              <RequireAuth>
+                <AppShell>
+                  <Routes>
+                    <Route path="/" element={<HomePage />} />
+                    <Route path="/shopping-list" element={<ShoppingListPage />} />
+                    <Route path="/image-processing" element={<ImageProcessingPage />} />
+                    <Route path="/notes" element={<NotesPage />} />
+                    <Route path="/watchlist" element={<WatchlistPage />} />
+                  </Routes>
+                </AppShell>
+              </RequireAuth>
+            }
+          />
         </Routes>
-      </AppShell>
+      </AuthProvider>
     </BrowserRouter>
   )
 }
