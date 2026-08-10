@@ -25,6 +25,9 @@
 /.claude/worktrees/
 /.superpowers/
 
+# --- Local-only design docs (not shared to remote) ---
+/docs/superpowers/
+
 # --- Personal reference (not project docs) ---
 CHEATSHEET.local.md
 infra/DEPLOYMENT_RUNBOOK.local.md

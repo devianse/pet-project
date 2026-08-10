@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+
+	"github.com/devianse/pet-project/backend/internal/platform"
 )
 
 type Handler struct {
@@ -75,7 +77,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		slog.Error("update last login", "error", err)
 	}
 
-	writeJSON(w, http.StatusOK, meResponse{Username: user.Username, DisplayName: user.DisplayName, Role: user.Role})
+	platform.WriteJSON(w, http.StatusOK, meResponse{Username: user.Username, DisplayName: user.DisplayName, Role: user.Role})
 }
 
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
@@ -107,11 +109,5 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	writeJSON(w, http.StatusOK, meResponse{Username: user.Username, DisplayName: user.DisplayName, Role: user.Role})
-}
-
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
+	platform.WriteJSON(w, http.StatusOK, meResponse{Username: user.Username, DisplayName: user.DisplayName, Role: user.Role})
 }
