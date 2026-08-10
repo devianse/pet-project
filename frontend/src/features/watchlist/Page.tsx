@@ -112,7 +112,14 @@ export default function WatchlistPage() {
           return (
             <RowCard key={item.id}>
               <Stack gap={3}>
-                <Row gap={3} align="top">
+                {/* wrap={false}: this Row defaults to wrap:true, and a long
+                    genre line's intrinsic width used to push the whole row
+                    past the card width, wrapping the content column below
+                    the poster instead of just wrapping the genre text
+                    itself within its own column (Stack already has
+                    min-w-0, so text wrapping inside it works fine once the
+                    outer row can't escape to a second line). */}
+                <Row gap={6} align="center" wrap={false}>
                   {item.poster_path ? (
                     <img
                       src={`${POSTER_BASE}${item.poster_path}`}
@@ -125,8 +132,14 @@ export default function WatchlistPage() {
                     </div>
                   )}
                   <Stack gap={2}>
-                    <Row justify="between">
-                      <Row gap={2}>
+                    {/* Row can't express "wrap below md, don't wrap above it" — its
+                        `wrap` prop is a flat boolean, not responsive — so this one
+                        spot uses a plain div with Tailwind's responsive flex
+                        classes instead of the primitive. Breakpoint matches
+                        AppShell's own md switch, so this card's mobile/desktop
+                        split lines up with the rest of the shell. */}
+                    <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-3">
+                      <Row gap={2} wrap={false}>
                         <span className="font-black text-ink">{item.title}</span>
                         {item.original_title && item.original_title !== item.title && (
                           <span className="italic text-muted">({item.original_title})</span>
@@ -168,8 +181,8 @@ export default function WatchlistPage() {
                           icon={<Icon name="remove" />}
                         />
                       </Row>
-                    </Row>
-                    <Row gap={3} align="center">
+                    </div>
+                    <Row gap={3} align="center" wrap={false}>
                       <a
                         href={`https://www.imdb.com/title/${item.imdb_id}/`}
                         target="_blank"
@@ -187,8 +200,14 @@ export default function WatchlistPage() {
                       {item.original_language && (
                         <span className="text-muted uppercase">{item.original_language}</span>
                       )}
-                      {item.genres && <span className="text-muted">{item.genres}</span>}
                     </Row>
+                    {/* Own line rather than sharing the Row above — that Row
+                        defaults to wrap:true, so a long genre string used to
+                        wrap in among the IMDb link/rating/language
+                        unpredictably per card, same failure mode the actions
+                        row had. Always-separate is deterministic on every
+                        viewport, not just phones. */}
+                    {item.genres && <span className="text-muted">{item.genres}</span>}
                   </Stack>
                 </Row>
                 {expanded && (
