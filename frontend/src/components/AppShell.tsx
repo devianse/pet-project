@@ -53,8 +53,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         ))}
         <div className="hidden md:block flex-1" />
         {user && (
-          <div className="hidden md:flex flex-col gap-2 px-2 pb-2">
-            <span className="text-sm font-bold text-muted truncate">
+          <div className="flex flex-row items-center gap-2 md:flex-col md:items-stretch md:gap-2 px-2 md:pb-2">
+            <span className="hidden md:block text-sm font-bold text-muted truncate">
               {user.display_name || user.username}
             </span>
             <Button onClick={logout} variant="quiet" size="sm">
