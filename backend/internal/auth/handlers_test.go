@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func newTestHandler(t *testing.T) (*Handler, *Store) {
@@ -85,6 +86,52 @@ func TestHandler_Login_UnknownUsername(t *testing.T) {
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401, got %d", rec.Code)
+	}
+}
+
+// TestHandler_Login_UnknownUsername_PaysBcryptCost guards against a
+// regression of the timing side-channel: an unknown username must still
+// run VerifyPassword (against the dummy hash) rather than short-circuiting,
+// so its response time is comparable to a known-username/wrong-password
+// login rather than near-instant. We can't reliably assert exact timing
+// in a unit test, but we can assert both paths take at least roughly the
+// same, bcrypt-dominated order of magnitude.
+func TestHandler_Login_UnknownUsername_PaysBcryptCost(t *testing.T) {
+	handler, store := newTestHandler(t)
+	ctx := context.Background()
+
+	hash, err := HashPassword("s3cret-pass")
+	if err != nil {
+		t.Fatalf("HashPassword: %v", err)
+	}
+	if _, err := store.CreateUser(ctx, "mike", hash, "admin"); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	timeLogin := func(body loginRequest) time.Duration {
+		payload, _ := json.Marshal(body)
+		req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(payload))
+		rec := httptest.NewRecorder()
+		start := time.Now()
+		handler.Login(rec, req)
+		elapsed := time.Since(start)
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("expected 401, got %d", rec.Code)
+		}
+		return elapsed
+	}
+
+	wrongPassword := timeLogin(loginRequest{Username: "mike", Password: "wrong-pass"})
+	unknownUsername := timeLogin(loginRequest{Username: "nobody", Password: "whatever"})
+
+	// bcrypt at the default cost dominates both paths (tens of
+	// milliseconds); a fixed field lookup or short-circuit would be
+	// orders of magnitude faster. Guard against a regression back to
+	// "unknown username returns near-instantly" rather than asserting a
+	// tight timing equivalence, which would be flaky.
+	const minBcryptFloor = 5 * time.Millisecond
+	if unknownUsername < minBcryptFloor {
+		t.Fatalf("unknown-username login returned in %v, expected it to pay a bcrypt-comparable cost (>= %v) like the wrong-password path (%v)", unknownUsername, minBcryptFloor, wrongPassword)
 	}
 }
 

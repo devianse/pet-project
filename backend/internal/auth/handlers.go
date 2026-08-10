@@ -27,6 +27,12 @@ type meResponse struct {
 	Role        string  `json:"role"`
 }
 
+// dummyHash is a valid bcrypt hash of no real password. Used to make
+// Login pay the same bcrypt cost whether the username exists or not,
+// closing a timing side-channel that would otherwise let a caller
+// distinguish "unknown username" from "wrong password" by response time.
+const dummyHash = "$2a$10$CwTycUXWue0Thq9StjUM0uJ8G8xtObW/gxSbeMhWaBaFTUKtBBWnu"
+
 // Login authenticates a username/password pair and, on success, sets the
 // session cookie. Every failure path (unknown username, wrong password)
 // returns the same generic 401 message — no signal that would let a
@@ -44,7 +50,13 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	if user == nil || !VerifyPassword(user.PasswordHash, req.Password) {
+	hashToCheck := dummyHash
+	if user != nil {
+		hashToCheck = user.PasswordHash
+	}
+	passwordOK := VerifyPassword(hashToCheck, req.Password)
+
+	if user == nil || !passwordOK {
 		http.Error(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
