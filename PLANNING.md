@@ -58,15 +58,33 @@ matches the shell-first order above one-for-one:
    during this pass: `infra/docker-compose.yml` wasn't passing
    `TMDB_READ_ACCESS_TOKEN` into the backend container at all (backend
    exits on startup without it) — added alongside this deployment.
-7. **Phase 2** (auth, WebSockets) and the rest of phase 3 (Family
-   Shopping List, then Image Processing) resume after that, order
-   unchanged from the sections below.
+7. **Real JWT auth** (phase 2, first half — done, on the `jwt` branch,
+   not yet merged to `main` as of this writing). Replaces the Caddy
+   basic-auth stopgap from step 4: a `users` table (invite-only, no
+   public registration — accounts are seeded via a new `cmd/createuser`
+   CLI), bcrypt password hashes, a signed JWT held in an httpOnly
+   `SameSite=Strict` session cookie, `admin`/`user` roles (fine-grained
+   per-user permissions deliberately deferred — see "Open questions"
+   below), and the whole SPA gated behind login. Full design/build
+   record: `docs/superpowers/specs/2026-08-10-jwt-auth-design.md` and
+   `docs/superpowers/plans/2026-08-10-jwt-auth.md`. Built via
+   `superpowers:subagent-driven-development` — 14 tasks, a final
+   whole-branch review caught one real Critical (the deploy runbook's
+   admin-seeding command didn't actually work against the built Docker
+   image — fixed) plus a mobile-nav logout gap, both fixed before this
+   was considered done. One accepted gap: the frontend auth flow
+   (login/logout/redirect) was verified via backend curl calls + code
+   review, not an actual rendered browser session — no browser
+   automation tool was available in that session.
+8. **WebSockets** (phase 2, second half — still not started) and the
+   rest of phase 3 (Family Shopping List, then Image Processing) resume
+   after that, order unchanged from the sections below.
 
 ## Platform shell — what gets built first
 
 - **Backend**: one Go module, real package structure (`cmd/`, `internal/...`) — unlike Task Tracker/URL Shortener's deliberate flat layout, the surface area here justifies it. Revisit `golang-standards/project-layout` for real.
 - **Frontend**: React SPA (Vite), client-side routing via `react-router`. User already knows React — this is "wire it to something real," not a React-learning exercise.
-- **Auth**: JWT, not sessions — user is comfortable with JWT from frontend work already, so the new ground is entirely the Go-side signing/verification/expiry logic. (Not currently a `GO_ROADMAP.md` concept — should be added there.)
+- **Auth**: JWT, not sessions — user is comfortable with JWT from frontend work already, so the new ground is entirely the Go-side signing/verification/expiry logic. (Not currently a `GO_ROADMAP.md` concept — should be added there.) **Done** (see build-order step 7 above) — landed as invite-only accounts (no self-registration), a single long-lived token (no refresh flow) in an httpOnly cookie, not `localStorage`.
 - **Real-time**: WebSockets as a cross-cutting platform feature (available to any project plugged in later), not a dedicated page. (Also not currently on `GO_ROADMAP.md` — should be added.)
 - **Reverse proxy**: Caddy, not nginx — automatic Let's Encrypt TLS with a ~3-line Caddyfile, no separate certbot container/cron needed. Caddy also serves the built React static files directly and reverse-proxies `/api/*` to the Go backend — no separate frontend container.
   - Known gotcha to avoid: nothing under `public/api/` in the frontend — the `/api/*` proxy rule is checked before the static-file fallback, so anything there would be permanently unreachable as a static asset.
@@ -149,6 +167,25 @@ Corrected framing from earlier in planning: OCR/photo parsing isn't a shopping-l
   3 resumes, or whether they're built in parallel
 - OCR approach (local Tesseract vs cloud API), if/when Image Processing gets built — not needed until that project is actually underway
 - Full phased implementation plan (SPEC-style, layer by layer like URL Shortener) for the shell first, then the shopping-list project — not written yet; next step should go through `superpowers:brainstorming` properly before that gets written, per standing skill-usage rules
+- **Fine-grained per-user permissions**, deferred during the JWT auth
+  brainstorm — the current `admin`/`user` role split is enough for "I
+  want to see some things other users can't at all," but the eventual
+  want is explicit feature-to-user gating (e.g. "user X can see feature
+  Y, user Z can't") rather than a role bucket. Not designed yet; a
+  likely later addition (a permissions table) that shouldn't require
+  touching the auth core when it happens.
+- **Browser-level verification of the JWT auth frontend flow**
+  (login/logout/redirect actually rendering and working, not just
+  passing code review + a curl-proven backend) — not done as of the
+  `jwt` branch landing; no browser automation tool was available in that
+  session and it was explicitly accepted as an open gap rather than
+  chased down. Worth a manual `make dev-backend` + `make dev-frontend`
+  click-through, or picking this up once `/chrome` is connected in a
+  future session, before or shortly after this branch merges.
+- **`jwt` branch merge** — implementation, task-level review, and a
+  final whole-branch review (with one fix wave) are all done and clean;
+  the branch itself hasn't been merged to `main` or opened as a PR yet,
+  by deliberate choice ("keep as-is" for now).
 
 ## Security TODO (deferred out of the pre-deployment hardening pass)
 
@@ -162,7 +199,14 @@ as genuinely dependent on later phases, not skipped by oversight:
   `govulncheck ./...`, `gitleaks detect` on every push/PR, plus
   Dependabot/Renovate for ongoing dependency updates
 - **Rate limiting** beyond the request body-size cap, once real traffic
-  patterns exist
+  patterns exist. Revisited (not changed) during the JWT auth branch's
+  final review: `POST /api/auth/login` is now a public, unauthenticated,
+  bcrypt-costed endpoint — a real (if low-severity for a personal
+  invite-only site) resource-exhaustion/password-guessing surface that
+  didn't exist before basic-auth was removed. Explicitly still deferred,
+  planned soon now that a VPS exists to configure it on (e.g. a Caddy or
+  `fail2ban` layer, or a small in-process per-IP limiter in front of
+  `Login`).
 - **CORS policy** — not needed yet (Caddy makes frontend/API
   same-origin), revisit if that changes
 - **CSP tightening** as the frontend grows past its current shape
