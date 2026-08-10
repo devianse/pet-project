@@ -2,7 +2,9 @@ import type { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { NavLink, type LinkComponent } from '@/components/pouf/NavLink'
 import type { IconName } from '@/components/pouf/Icon'
+import { Button } from '@/components/pouf/Button'
 import { ThemeToggle } from './ThemeToggle'
+import { useAuth } from '@/shared/auth'
 
 // pouf's NavLink takes a router-agnostic `href` prop; this adapts it to
 // react-router-dom's `Link`, which wants `to` instead.
@@ -27,6 +29,7 @@ const NAV_ITEMS: { href: string; label: string; icon: IconName }[] = [
 // so content doesn't stretch edge-to-edge on large monitors.
 export function AppShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
+  const { user, logout } = useAuth()
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row bg-bg text-ink">
@@ -49,6 +52,16 @@ export function AppShell({ children }: { children: ReactNode }) {
           </NavLink>
         ))}
         <div className="hidden md:block flex-1" />
+        {user && (
+          <div className="hidden md:flex flex-col gap-2 px-2 pb-2">
+            <span className="text-sm font-bold text-muted truncate">
+              {user.display_name || user.username}
+            </span>
+            <Button onClick={logout} variant="quiet" size="sm">
+              Log out
+            </Button>
+          </div>
+        )}
         <ThemeToggle />
       </nav>
       <main className="flex-1 min-w-0 p-4 md:p-8 2xl:mx-auto 2xl:w-full 2xl:max-w-350">
