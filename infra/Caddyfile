@@ -9,10 +9,6 @@
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 	}
 
-	basic_auth {
-		{$BASIC_AUTH_USER} {$BASIC_AUTH_PASSWORD_HASH}
-	}
-
 	handle /api/* {
 		reverse_proxy backend:8080
 	}
