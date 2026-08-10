@@ -9,6 +9,12 @@ import (
 	"github.com/devianse/pet-project/backend/internal/db"
 )
 
+// setupStore clears only this package's own fixture usernames rather
+// than the whole users table — internal/auth's tests share the same
+// DATABASE_URL/table, and go test runs different packages' binaries
+// concurrently by default, so an unscoped DELETE here would race with
+// internal/auth's tests regardless of whether the fixture usernames
+// themselves collide.
 func setupStore(t *testing.T) *auth.Store {
 	t.Helper()
 	dsn := os.Getenv("DATABASE_URL")
@@ -26,7 +32,8 @@ func setupStore(t *testing.T) *auth.Store {
 	if err := store.EnsureSchema(context.Background()); err != nil {
 		t.Fatalf("ensuring schema: %v", err)
 	}
-	if _, err := conn.ExecContext(context.Background(), "DELETE FROM users"); err != nil {
+	if _, err := conn.ExecContext(context.Background(),
+		"DELETE FROM users WHERE username IN ('cli-mike', 'cli-dupe')"); err != nil {
 		t.Fatalf("clearing users table: %v", err)
 	}
 	return store

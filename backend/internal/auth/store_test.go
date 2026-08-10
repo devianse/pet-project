@@ -9,9 +9,17 @@ import (
 )
 
 // setupStore connects to the local Postgres pointed at by DATABASE_URL,
-// ensures the users table exists, and clears it so each test starts
-// empty. Skipped (not failed) if DATABASE_URL isn't set, matching
-// internal/notes' existing test pattern.
+// ensures the users table exists, and clears this package's own fixture
+// rows so each test starts from a known state. Skipped (not failed) if
+// DATABASE_URL isn't set, matching internal/notes' existing test pattern.
+//
+// The users table is also touched by cmd/createuser's tests against the
+// same DATABASE_URL, and `go test ./...` runs different packages'
+// binaries concurrently by default — an unscoped `DELETE FROM users`
+// here would wipe rows cmd/createuser's tests just inserted (and vice
+// versa) regardless of whether the fixture usernames themselves
+// collide. Deleting only this package's own known fixture usernames
+// keeps the two packages' tests from ever touching each other's rows.
 func setupStore(t *testing.T) *Store {
 	t.Helper()
 	dsn := os.Getenv("DATABASE_URL")
@@ -29,7 +37,8 @@ func setupStore(t *testing.T) *Store {
 	if err := store.EnsureSchema(context.Background()); err != nil {
 		t.Fatalf("ensuring schema: %v", err)
 	}
-	if _, err := conn.ExecContext(context.Background(), "DELETE FROM users"); err != nil {
+	if _, err := conn.ExecContext(context.Background(),
+		"DELETE FROM users WHERE username IN ('mike', 'alice', 'bob', 'dupe')"); err != nil {
 		t.Fatalf("clearing users table: %v", err)
 	}
 	return store
