@@ -109,13 +109,19 @@ the reasoning. Steps to provision a fresh VPS:
 4. **Deploy.** Clone the whole repo onto the VPS (not just `infra/` —
    `infra/docker-compose.yml`'s builds need `frontend/` and `backend/` as
    build context too), set real values in `infra/.env` (a real `DOMAIN`,
-   a freshly generated `BASIC_AUTH_PASSWORD_HASH`, real Postgres
-   credentials — never the `.env.example` placeholders), then `cd infra
-   && docker compose up --build -d`.
+   a freshly generated `JWT_SECRET`, real Postgres credentials — never
+   the `.env.example` placeholders), then `cd infra && docker compose up
+   --build -d`. Immediately after, seed the first admin account —
+   `docker compose exec backend go run ./cmd/createuser -username=<name>
+   -role=admin` — before considering the deploy done: nothing else gates
+   the site once basic-auth is gone.
 5. **DNS.** Point the domain's A record at the VPS's public IP before
    step 4's first request — Caddy requests its TLS certificate on first
    contact and needs the domain already resolving.
 
-Basic auth (site-wide, one shared credential pair) gates the whole app
-until phase 2's real JWT auth replaces it — see `PLANNING.md`'s Security
-TODO section.
+Real per-user JWT auth (login page, httpOnly session cookie) gates the
+whole app — see `docs/superpowers/specs/2026-08-10-jwt-auth-design.md`.
+Accounts are invite-only: no public registration endpoint, seed one
+with `go run ./cmd/createuser -username=<name> -role=admin|user` (run
+against the deployed database, e.g. via `docker compose exec backend
+go run ./cmd/createuser ...`, or locally against `DATABASE_URL`).

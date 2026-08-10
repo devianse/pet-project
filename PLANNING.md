@@ -156,7 +156,8 @@ Recorded during the pre-deployment security brainstorm
 (`docs/superpowers/specs/2026-08-09-pre-deployment-security-design.md`)
 as genuinely dependent on later phases, not skipped by oversight:
 
-- **Real JWT auth** (phase 2) replacing the Caddy basic-auth stopgap
+- ~~Real JWT auth (phase 2) replacing the Caddy basic-auth stopgap~~ —
+  done, see `docs/superpowers/specs/2026-08-10-jwt-auth-design.md`
 - **CI/CD pipeline** automating what's manual for now: `npm audit`,
   `govulncheck ./...`, `gitleaks detect` on every push/PR, plus
   Dependabot/Renovate for ongoing dependency updates
