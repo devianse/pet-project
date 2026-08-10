@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/devianse/pet-project/backend/internal/auth"
 	"github.com/devianse/pet-project/backend/internal/db"
 	"github.com/devianse/pet-project/backend/internal/notes"
 	"github.com/devianse/pet-project/backend/internal/watchlist"
@@ -67,15 +68,33 @@ func main() {
 	}
 	watchlistHandler := watchlist.NewHandler(watchlistStore, tmdbClient)
 
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		logger.Error("JWT_SECRET is not set")
+		os.Exit(1)
+	}
+	secureCookies := os.Getenv("ENV") == "production"
+
+	authStore := auth.NewStore(conn)
+	if err := authStore.EnsureSchema(context.Background()); err != nil {
+		logger.Error("failed to ensure users schema", "error", err)
+		os.Exit(1)
+	}
+	authHandler := auth.NewHandler(authStore, []byte(jwtSecret), secureCookies)
+	requireAuth := auth.Require([]byte(jwtSecret))
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", handleHealth)
-	mux.HandleFunc("GET /api/notes", notesHandler.List)
-	mux.HandleFunc("POST /api/notes", notesHandler.Create)
-	mux.HandleFunc("DELETE /api/notes/{id}", notesHandler.Delete)
-	mux.HandleFunc("GET /api/watchlist", watchlistHandler.List)
-	mux.HandleFunc("POST /api/watchlist", watchlistHandler.Create)
-	mux.HandleFunc("PATCH /api/watchlist/{id}", watchlistHandler.SetViewed)
-	mux.HandleFunc("DELETE /api/watchlist/{id}", watchlistHandler.Delete)
+	mux.HandleFunc("POST /api/auth/login", authHandler.Login)
+	mux.HandleFunc("POST /api/auth/logout", authHandler.Logout)
+	mux.HandleFunc("GET /api/me", authHandler.Me)
+	mux.Handle("GET /api/notes", requireAuth(http.HandlerFunc(notesHandler.List)))
+	mux.Handle("POST /api/notes", requireAuth(http.HandlerFunc(notesHandler.Create)))
+	mux.Handle("DELETE /api/notes/{id}", requireAuth(http.HandlerFunc(notesHandler.Delete)))
+	mux.Handle("GET /api/watchlist", requireAuth(http.HandlerFunc(watchlistHandler.List)))
+	mux.Handle("POST /api/watchlist", requireAuth(http.HandlerFunc(watchlistHandler.Create)))
+	mux.Handle("PATCH /api/watchlist/{id}", requireAuth(http.HandlerFunc(watchlistHandler.SetViewed)))
+	mux.Handle("DELETE /api/watchlist/{id}", requireAuth(http.HandlerFunc(watchlistHandler.Delete)))
 
 	port := os.Getenv("PORT")
 	if port == "" {
