@@ -1,23 +1,11 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <script>
-      // Runs synchronously before paint, so the correct theme is applied
-      // with zero flash. Default is dark — unlike 1st-Pouf's own suggested
-      // script, this deliberately ignores prefers-color-scheme: dark is
-      // the default regardless of the visitor's OS setting, per this
-      // project's design choice (see design-system spec, "Theming").
-      ;(function () {
-        try {
-          var stored = localStorage.getItem('theme')
-          document.documentElement.classList.toggle('dark', stored !== 'light')
-        } catch (e) {
-          // localStorage can throw in private/restricted contexts — fall
-          // back to the default (dark) rather than losing the page.
-          document.documentElement.classList.add('dark')
-        }
-      })()
-    </script>
+    <!-- Same-origin file, not inline — see theme-init.js's own comment for
+         why (CSP's default-src 'self' silently blocks inline scripts in
+         production, so this must not be inline). Runs synchronously
+         before paint, so the correct theme is applied with zero flash. -->
+    <script src="/theme-init.js"></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>frontend</title>

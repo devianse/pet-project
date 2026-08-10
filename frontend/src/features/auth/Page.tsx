@@ -5,6 +5,7 @@ import { Card } from '@/components/pouf/surface'
 import { Field, Input } from '@/components/pouf/Input'
 import { Button } from '@/components/pouf/Button'
 import { Stack } from '@/components/pouf/layout'
+import { ThemeToggle } from '@/components/ThemeToggle'
 
 type LocationState = { from?: { pathname: string } }
 
@@ -37,7 +38,10 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-bg p-4">
+    <div className="relative flex min-h-screen items-center justify-center bg-bg p-4">
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
       <Card>
         <form onSubmit={handleSubmit}>
           <Stack gap={4}>
