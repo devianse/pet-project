@@ -198,15 +198,18 @@ as genuinely dependent on later phases, not skipped by oversight:
 - **CI/CD pipeline** automating what's manual for now: `npm audit`,
   `govulncheck ./...`, `gitleaks detect` on every push/PR, plus
   Dependabot/Renovate for ongoing dependency updates
-- **Rate limiting** beyond the request body-size cap, once real traffic
-  patterns exist. Revisited (not changed) during the JWT auth branch's
-  final review: `POST /api/auth/login` is now a public, unauthenticated,
-  bcrypt-costed endpoint — a real (if low-severity for a personal
-  invite-only site) resource-exhaustion/password-guessing surface that
-  didn't exist before basic-auth was removed. Explicitly still deferred,
-  planned soon now that a VPS exists to configure it on (e.g. a Caddy or
-  `fail2ban` layer, or a small in-process per-IP limiter in front of
-  `Login`).
+- ~~Rate limiting on `POST /api/auth/login`~~ — done: an in-process
+  per-IP token-bucket middleware (`backend/cmd/api/ratelimit.go`, 5
+  requests/min, burst 5), chosen over a Caddy-plugin or fail2ban layer
+  because it needs no custom Caddy build and stays testable in the same
+  suite as the rest of `internal/auth`. Trusts `X-Forwarded-For` from
+  Caddy, which is safe only because the backend has no host port mapping
+  in `infra/docker-compose.yml` — revisit if that ever changes. State is
+  per-process/per-replica (fine for the current single-VPS, single-
+  instance topology per this doc's "No Kubernetes / load balancer" note
+  above; wouldn't be if that changes). Broader request-volume limiting
+  beyond this one endpoint is still deferred until real traffic patterns
+  exist.
 - **CORS policy** — not needed yet (Caddy makes frontend/API
   same-origin), revisit if that changes
 - **CSP tightening** as the frontend grows past its current shape
