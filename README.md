@@ -112,7 +112,7 @@ the reasoning. Steps to provision a fresh VPS:
    a freshly generated `JWT_SECRET`, real Postgres credentials — never
    the `.env.example` placeholders), then `cd infra && docker compose up
    --build -d`. Immediately after, seed the first admin account —
-   `docker compose exec backend go run ./cmd/createuser -username=<name>
+   `docker compose exec backend createuser -username=<name>
    -role=admin` — before considering the deploy done: nothing else gates
    the site once basic-auth is gone.
 5. **DNS.** Point the domain's A record at the VPS's public IP before
@@ -123,5 +123,7 @@ Real per-user JWT auth (login page, httpOnly session cookie) gates the
 whole app — see `docs/superpowers/specs/2026-08-10-jwt-auth-design.md`.
 Accounts are invite-only: no public registration endpoint, seed one
 with `go run ./cmd/createuser -username=<name> -role=admin|user` (run
-against the deployed database, e.g. via `docker compose exec backend
-go run ./cmd/createuser ...`, or locally against `DATABASE_URL`).
+locally against `DATABASE_URL`), or against the deployed database via
+`docker compose exec backend createuser -username=<name>
+-role=admin|user` — the runtime image ships the `createuser` binary
+alongside `api`, no Go toolchain needed inside the container.
