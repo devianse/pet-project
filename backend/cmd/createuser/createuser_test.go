@@ -35,16 +35,16 @@ func setupStore(t *testing.T) *auth.Store {
 func TestCreateUser_Success(t *testing.T) {
 	store := setupStore(t)
 
-	if err := createUser(context.Background(), store, "mike", "s3cret-pass", "admin"); err != nil {
+	if err := createUser(context.Background(), store, "cli-mike", "s3cret-pass", "admin"); err != nil {
 		t.Fatalf("createUser: %v", err)
 	}
 
-	found, err := store.FindByUsername(context.Background(), "mike")
+	found, err := store.FindByUsername(context.Background(), "cli-mike")
 	if err != nil {
 		t.Fatalf("FindByUsername: %v", err)
 	}
 	if found == nil || found.Role != "admin" {
-		t.Fatalf("expected mike to exist with role admin, got %+v", found)
+		t.Fatalf("expected cli-mike to exist with role admin, got %+v", found)
 	}
 	if !auth.VerifyPassword(found.PasswordHash, "s3cret-pass") {
 		t.Fatal("expected the stored hash to verify against the original password")
@@ -54,10 +54,10 @@ func TestCreateUser_Success(t *testing.T) {
 func TestCreateUser_RejectsDuplicateUsername(t *testing.T) {
 	store := setupStore(t)
 
-	if err := createUser(context.Background(), store, "dupe", "pass-one", "user"); err != nil {
+	if err := createUser(context.Background(), store, "cli-dupe", "pass-one", "user"); err != nil {
 		t.Fatalf("createUser (first): %v", err)
 	}
-	if err := createUser(context.Background(), store, "dupe", "pass-two", "user"); err == nil {
+	if err := createUser(context.Background(), store, "cli-dupe", "pass-two", "user"); err == nil {
 		t.Fatal("expected an error creating a duplicate username")
 	}
 }
