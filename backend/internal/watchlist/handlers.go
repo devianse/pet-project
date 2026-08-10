@@ -6,7 +6,8 @@ import (
 	"log/slog"
 	"net/http"
 	"regexp"
-	"strconv"
+
+	"github.com/devianse/pet-project/backend/internal/platform"
 )
 
 var imdbTitleURLPattern = regexp.MustCompile(`^(?i:https?://(www\.)?imdb\.com)/title/(tt\d+)`)
@@ -39,7 +40,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusOK, items)
+	platform.WriteJSON(w, http.StatusOK, items)
 }
 
 type createRequest struct {
@@ -80,7 +81,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusOK, item)
+	platform.WriteJSON(w, http.StatusOK, item)
 }
 
 type setViewedRequest struct {
@@ -88,8 +89,8 @@ type setViewedRequest struct {
 }
 
 func (h *Handler) SetViewed(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
+	id, ok := platform.IDParam(r)
+	if !ok {
 		http.Error(w, "invalid id", http.StatusBadRequest)
 		return
 	}
@@ -114,8 +115,8 @@ func (h *Handler) SetViewed(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
+	id, ok := platform.IDParam(r)
+	if !ok {
 		http.Error(w, "invalid id", http.StatusBadRequest)
 		return
 	}
@@ -131,10 +132,4 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
-}
-
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
 }

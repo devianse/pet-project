@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
+
+	"github.com/devianse/pet-project/backend/internal/platform"
 )
 
 const maxContentLength = 10000
@@ -27,7 +28,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusOK, notes)
+	platform.WriteJSON(w, http.StatusOK, notes)
 }
 
 type createRequest struct {
@@ -59,13 +60,12 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusOK, notes)
+	platform.WriteJSON(w, http.StatusOK, notes)
 }
 
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
-	idStr := r.PathValue("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
+	id, ok := platform.IDParam(r)
+	if !ok {
 		http.Error(w, "invalid id", http.StatusBadRequest)
 		return
 	}
@@ -91,10 +91,4 @@ func validateContent(content string) error {
 		return fmt.Errorf("content exceeds maximum length of %d characters", maxContentLength)
 	}
 	return nil
-}
-
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
 }
