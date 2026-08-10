@@ -1,4 +1,3 @@
-// backend/internal/auth/cookie.go
 package auth
 
 import "net/http"

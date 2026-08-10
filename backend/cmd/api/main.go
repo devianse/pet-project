@@ -1,8 +1,9 @@
 // Phase 1 scaffold, now with the Notes and Watchlist features wired in as
 // deliberate detours ahead of the shell-first plan (see
 // docs/superpowers/specs/2026-08-08-notes-design.md and
-// docs/superpowers/specs/2026-08-09-movie-tv-sharing-list-design.md).
-// Still no auth.
+// docs/superpowers/specs/2026-08-09-movie-tv-sharing-list-design.md),
+// plus real per-user JWT auth gating the whole app (see
+// docs/superpowers/specs/2026-08-10-jwt-auth-design.md).
 package main
 
 import (

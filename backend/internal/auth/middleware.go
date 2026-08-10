@@ -1,4 +1,3 @@
-// backend/internal/auth/middleware.go
 package auth
 
 import (
@@ -10,6 +9,17 @@ type contextKey string
 
 const claimsContextKey contextKey = "auth_claims"
 
+// claimsFromRequest reads the session cookie off r and parses it into
+// Claims. Shared by Require and Me so the two paths that decide whether a
+// cookie is valid can't silently drift apart.
+func claimsFromRequest(r *http.Request, secret []byte) (*Claims, error) {
+	cookie, err := r.Cookie(cookieName)
+	if err != nil {
+		return nil, err
+	}
+	return ParseToken(secret, cookie.Value)
+}
+
 // Require wraps a handler so it 401s without a valid session cookie,
 // otherwise injects the parsed claims into the request context so
 // downstream handlers can read the caller's user id/role without
@@ -17,12 +27,7 @@ const claimsContextKey contextKey = "auth_claims"
 func Require(secret []byte) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			cookie, err := r.Cookie(cookieName)
-			if err != nil {
-				http.Error(w, "unauthorized", http.StatusUnauthorized)
-				return
-			}
-			claims, err := ParseToken(secret, cookie.Value)
+			claims, err := claimsFromRequest(r, secret)
 			if err != nil {
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return

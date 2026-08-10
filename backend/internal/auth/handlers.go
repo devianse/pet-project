@@ -87,12 +87,7 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 // claims verbatim, so a display_name/role change since the token was
 // issued shows up immediately instead of only after the next login.
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
-	cookie, err := r.Cookie(cookieName)
-	if err != nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-	claims, err := ParseToken(h.secret, cookie.Value)
+	claims, err := claimsFromRequest(r, h.secret)
 	if err != nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
