@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/devianse/pet-project/backend/internal/auth"
 	"github.com/devianse/pet-project/backend/internal/db"
@@ -84,9 +85,17 @@ func main() {
 	authHandler := auth.NewHandler(authStore, []byte(jwtSecret), secureCookies)
 	requireAuth := auth.Require([]byte(jwtSecret))
 
+	// loginLimiter caps login attempts per IP: bcrypt-costed and, since
+	// JWT auth replaced Caddy basic-auth, publicly reachable and
+	// unauthenticated — see PLANNING.md's Security TODO. 5 requests/min
+	// with a burst of 5 tolerates a genuine mistyped-password retry
+	// without leaving the endpoint open to unlimited guessing.
+	loginLimiter := newIPRateLimiter(rateEvery(time.Minute/5), 5)
+	go loginLimiter.startCleanup(context.Background(), 10*time.Minute, time.Hour)
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", handleHealth)
-	mux.HandleFunc("POST /api/auth/login", authHandler.Login)
+	mux.Handle("POST /api/auth/login", rateLimitMiddleware(loginLimiter, http.HandlerFunc(authHandler.Login)))
 	mux.HandleFunc("POST /api/auth/logout", authHandler.Logout)
 	mux.HandleFunc("GET /api/me", authHandler.Me)
 	mux.Handle("GET /api/notes", requireAuth(http.HandlerFunc(notesHandler.List)))
