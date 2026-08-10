@@ -1,11 +1,68 @@
 // Phase 1: just enough to prove frontend -> backend wiring works end to end.
-// Grows into a real API client (auth headers, error handling) in phase 2.
+// Phase 2: grows into a real API client — auth-aware requests plus a
+// session probe (getMe) and login/logout calls.
+
+let onUnauthorized: (() => void) | null = null
+
+// Set by AuthProvider so any authenticated call that gets a 401 (session
+// expired mid-use, not just at app load) can clear client-side auth state
+// and let RequireAuth redirect to /login — without every page's fetch
+// call needing to know about auth itself.
+export function setUnauthorizedHandler(handler: (() => void) | null) {
+  onUnauthorized = handler
+}
+
+// Wraps fetch for calls that require an existing session. Login/logout/
+// getMe deliberately use plain fetch instead — a 401 from getMe is how a
+// logged-out session gets discovered in the first place, not a session
+// that expired mid-use.
+async function request(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const res = await fetch(input, init)
+  if (res.status === 401) {
+    onUnauthorized?.()
+  }
+  return res
+}
+
 export async function getHealth(): Promise<{ status: string }> {
   const res = await fetch('/api/health')
   if (!res.ok) {
     throw new Error(`health check failed: ${res.status}`)
   }
   return res.json()
+}
+
+export type User = {
+  username: string
+  display_name: string | null
+  role: 'admin' | 'user'
+}
+
+export async function getMe(): Promise<User | null> {
+  const res = await fetch('/api/me')
+  if (res.status === 401) {
+    return null
+  }
+  if (!res.ok) {
+    throw new Error(`failed to load session: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function login(username: string, password: string): Promise<User> {
+  const res = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  })
+  if (!res.ok) {
+    throw new Error('invalid credentials')
+  }
+  return res.json()
+}
+
+export async function logout(): Promise<void> {
+  await fetch('/api/auth/logout', { method: 'POST' })
 }
 
 export type Note = {
@@ -15,7 +72,7 @@ export type Note = {
 }
 
 export async function getNotes(): Promise<Note[]> {
-  const res = await fetch('/api/notes')
+  const res = await request('/api/notes')
   if (!res.ok) {
     throw new Error(`failed to load notes: ${res.status}`)
   }
@@ -23,7 +80,7 @@ export async function getNotes(): Promise<Note[]> {
 }
 
 export async function createNotes(items: string[]): Promise<Note[]> {
-  const res = await fetch('/api/notes', {
+  const res = await request('/api/notes', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ items }),
@@ -35,7 +92,7 @@ export async function createNotes(items: string[]): Promise<Note[]> {
 }
 
 export async function deleteNote(id: number): Promise<void> {
-  const res = await fetch(`/api/notes/${id}`, { method: 'DELETE' })
+  const res = await request(`/api/notes/${id}`, { method: 'DELETE' })
   if (!res.ok) {
     throw new Error(`failed to delete note: ${res.status}`)
   }
@@ -60,7 +117,7 @@ export type WatchlistItem = {
 }
 
 export async function getWatchlist(): Promise<WatchlistItem[]> {
-  const res = await fetch('/api/watchlist')
+  const res = await request('/api/watchlist')
   if (!res.ok) {
     throw new Error(`failed to load watchlist: ${res.status}`)
   }
@@ -68,7 +125,7 @@ export async function getWatchlist(): Promise<WatchlistItem[]> {
 }
 
 export async function addToWatchlist(link: string): Promise<WatchlistItem> {
-  const res = await fetch('/api/watchlist', {
+  const res = await request('/api/watchlist', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ link }),
@@ -81,7 +138,7 @@ export async function addToWatchlist(link: string): Promise<WatchlistItem> {
 }
 
 export async function setWatchlistItemViewed(id: number, viewed: boolean): Promise<void> {
-  const res = await fetch(`/api/watchlist/${id}`, {
+  const res = await request(`/api/watchlist/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ viewed }),
@@ -92,7 +149,7 @@ export async function setWatchlistItemViewed(id: number, viewed: boolean): Promi
 }
 
 export async function removeFromWatchlist(id: number): Promise<void> {
-  const res = await fetch(`/api/watchlist/${id}`, { method: 'DELETE' })
+  const res = await request(`/api/watchlist/${id}`, { method: 'DELETE' })
   if (!res.ok) {
     throw new Error(`failed to remove watchlist item: ${res.status}`)
   }
