@@ -44,7 +44,16 @@ export function Tabs({ tabs, value, onChange, tone = 'blue' }: TabsProps) {
           <RTabs.Trigger
             key={t.value}
             value={t.value}
-            className={clsx(buttonClasses({ size: 'sm', tone }), 'pouf-tabs__trigger')}
+            className={clsx(
+              // Every trigger rendered `solid` in the same tone regardless
+              // of selection, so the only signal that one was active was a
+              // 2px press shadow — easy to miss. Same fix as Segmented:
+              // the active tab is filled (`solid`), the rest sit outlined
+              // and transparent (`quiet`); [data-state='active'] in
+              // pouf.css still adds the pressed-in depth on top.
+              buttonClasses({ size: 'sm', tone, variant: t.value === value ? 'solid' : 'quiet' }),
+              'pouf-tabs__trigger',
+            )}
           >
             {t.label}
           </RTabs.Trigger>
