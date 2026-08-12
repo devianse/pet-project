@@ -5,6 +5,7 @@ import ShoppingListPage from './features/shopping-list/Page'
 import ImageProcessingPage from './features/image-processing/Page'
 import NotesPage from './features/notes/Page'
 import WatchlistPage from './features/watchlist/Page'
+import DateNightPage from './features/date-night/Page'
 import LoginPage from './features/auth/Page'
 import { AppShell } from './components/AppShell'
 import { AuthProvider, useAuth } from './shared/auth'
@@ -42,6 +43,7 @@ export default function App() {
                     <Route path="/image-processing" element={<ImageProcessingPage />} />
                     <Route path="/notes" element={<NotesPage />} />
                     <Route path="/watchlist" element={<WatchlistPage />} />
+                    <Route path="/date-night" element={<DateNightPage />} />
                   </Routes>
                 </AppShell>
               </RequireAuth>
