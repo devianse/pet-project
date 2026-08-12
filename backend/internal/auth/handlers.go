@@ -24,6 +24,7 @@ type loginRequest struct {
 }
 
 type meResponse struct {
+	ID          int64   `json:"id"`
 	Username    string  `json:"username"`
 	DisplayName *string `json:"display_name"`
 	Role        string  `json:"role"`
@@ -77,7 +78,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		slog.Error("update last login", "error", err)
 	}
 
-	platform.WriteJSON(w, http.StatusOK, meResponse{Username: user.Username, DisplayName: user.DisplayName, Role: user.Role})
+	platform.WriteJSON(w, http.StatusOK, meResponse{ID: user.ID, Username: user.Username, DisplayName: user.DisplayName, Role: user.Role})
 }
 
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
@@ -109,5 +110,5 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	platform.WriteJSON(w, http.StatusOK, meResponse{Username: user.Username, DisplayName: user.DisplayName, Role: user.Role})
+	platform.WriteJSON(w, http.StatusOK, meResponse{ID: user.ID, Username: user.Username, DisplayName: user.DisplayName, Role: user.Role})
 }

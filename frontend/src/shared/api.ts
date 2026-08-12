@@ -33,6 +33,7 @@ export async function getHealth(): Promise<{ status: string }> {
 }
 
 export type User = {
+  id: number
   username: string
   display_name: string | null
   role: 'admin' | 'user'

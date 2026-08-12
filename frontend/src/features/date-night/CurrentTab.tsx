@@ -8,6 +8,7 @@ import {
   type DateNightProposal,
   type DateNightProposals,
 } from '@/shared/api'
+import { useAuth } from '@/shared/auth'
 import { Card } from '@/components/pouf/surface'
 import { Button } from '@/components/pouf/Button'
 import { Stack, Row } from '@/components/pouf/layout'
@@ -31,6 +32,7 @@ export function CurrentTab({
   activities: DateNightActivity[]
   onProposalsChange: (proposals: DateNightProposals) => void
 }) {
+  const { user } = useAuth()
   const [error, setError] = useState<string | null>(null)
   const current = proposals.current
 
@@ -100,7 +102,7 @@ export function CurrentTab({
             <span className="font-bold">
               {formatProposalDate(current.date)} · {TIME_SLOT_LABEL[current.time_slot]}
             </span>
-            {current.status === 'pending' && (
+            {current.status === 'pending' && user && current.proposed_by_user_id !== user.id && (
               <Row gap={3}>
                 <Button onClick={accept} tone="mint">
                   Accept
