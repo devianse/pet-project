@@ -79,6 +79,18 @@ matches the shell-first order above one-for-one:
 8. **WebSockets** (phase 2, second half — still not started) and the
    rest of phase 3 (Family Shopping List, then Image Processing) resume
    after that, order unchanged from the sections below.
+9. **Date Night** (done) — another pre-phase-3 detour, a playful
+   propose/respond page scoped to exactly two paired accounts
+   (`DATE_NIGHT_USERNAMES`, matched against seeded account usernames):
+   one person proposes a day, time slot, and activity, the other accepts
+   or declines. It's the first feature to actually use per-user identity
+   from the JWT auth step 7 landed — Notes and Watchlist are open behind
+   the login wall but don't attribute actions by user. Shipped as an
+   explicit v1, with Phase 2 work (WebSockets for live updates, Telegram
+   notify on propose/accept/decline) documented but deliberately
+   deferred in its own spec. See
+   `docs/superpowers/specs/2026-08-12-date-night-design.md` and
+   `docs/superpowers/plans/2026-08-12-date-night.md`.
 
 ## Platform shell — what gets built first
 

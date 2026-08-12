@@ -33,6 +33,7 @@ export async function getHealth(): Promise<{ status: string }> {
 }
 
 export type User = {
+  id: number
   username: string
   display_name: string | null
   role: 'admin' | 'user'
@@ -153,4 +154,118 @@ export async function removeFromWatchlist(id: number): Promise<void> {
   if (!res.ok) {
     throw new Error(`failed to remove watchlist item: ${res.status}`)
   }
+}
+
+export type DateNightCategory = 'food' | 'outdoor' | 'cozy' | 'adventure' | 'culture'
+
+export type DateNightActivity = {
+  id: number
+  name: string
+  description: string | null
+  category: DateNightCategory
+  created_at: string
+}
+
+export type DateNightTimeSlot = 'morning' | 'afternoon' | 'evening' | 'night'
+export type DateNightEnergyLevel = 'couch_potato' | 'casual' | 'adventurous' | 'unstoppable'
+export type DateNightMood =
+  | 'romantic'
+  | 'playful'
+  | 'nostalgic'
+  | 'cozy'
+  | 'excited'
+  | 'chill'
+  | 'sentimental'
+  | 'silly'
+export type DateNightStatus = 'pending' | 'accepted' | 'declined'
+
+export type DateNightProposal = {
+  id: number
+  activity_id: number
+  date: string
+  time_slot: DateNightTimeSlot
+  energy_level: DateNightEnergyLevel
+  moods: DateNightMood[]
+  status: DateNightStatus
+  proposed_by_user_id: number
+  created_at: string
+}
+
+export type DateNightProposals = {
+  current: DateNightProposal | null
+  history: DateNightProposal[]
+}
+
+// The datenight routes 403 any account outside DATE_NIGHT_USERNAMES.
+// Until the per-user page-visibility system exists (see CLAUDE.md's
+// "Current phase"), the nav entry is visible to everyone, so this is a
+// state the page has to render deliberately rather than as a failure.
+export class DateNightForbiddenError extends Error {
+  constructor() {
+    super('this account is not part of the pair')
+  }
+}
+
+export async function getDateNightActivities(): Promise<DateNightActivity[]> {
+  const res = await request('/api/datenight/activities')
+  if (res.status === 403) throw new DateNightForbiddenError()
+  if (!res.ok) throw new Error(`failed to load activities: ${res.status}`)
+  return res.json()
+}
+
+export async function createDateNightActivity(
+  name: string,
+  description: string | null,
+  category: DateNightCategory,
+): Promise<DateNightActivity> {
+  const res = await request('/api/datenight/activities', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, description, category }),
+  })
+  if (!res.ok) throw new Error(`failed to create activity: ${res.status}`)
+  return res.json()
+}
+
+export async function deleteDateNightActivity(id: number): Promise<void> {
+  const res = await request(`/api/datenight/activities/${id}`, { method: 'DELETE' })
+  // 409 means a proposal still references it — the server's message says
+  // so in words worth showing, unlike a bare status code.
+  if (res.status === 409) throw new Error((await res.text()).trim())
+  if (!res.ok) throw new Error(`failed to delete activity: ${res.status}`)
+}
+
+export async function getDateNightProposals(): Promise<DateNightProposals> {
+  const res = await request('/api/datenight/proposals')
+  if (res.status === 403) throw new DateNightForbiddenError()
+  if (!res.ok) throw new Error(`failed to load proposals: ${res.status}`)
+  return res.json()
+}
+
+export async function createDateNightProposal(input: {
+  activity_id: number
+  date: string
+  time_slot: DateNightTimeSlot
+  energy_level: DateNightEnergyLevel
+  moods: DateNightMood[]
+}): Promise<DateNightProposal> {
+  const res = await request('/api/datenight/proposals', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!res.ok) throw new Error(`failed to create proposal: ${res.status}`)
+  return res.json()
+}
+
+export async function acceptDateNightProposal(id: number): Promise<DateNightProposal> {
+  const res = await request(`/api/datenight/proposals/${id}/accept`, { method: 'POST' })
+  if (!res.ok) throw new Error(`failed to accept proposal: ${res.status}`)
+  return res.json()
+}
+
+export async function declineDateNightProposal(id: number): Promise<DateNightProposal> {
+  const res = await request(`/api/datenight/proposals/${id}/decline`, { method: 'POST' })
+  if (!res.ok) throw new Error(`failed to decline proposal: ${res.status}`)
+  return res.json()
 }

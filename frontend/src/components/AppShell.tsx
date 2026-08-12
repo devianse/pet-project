@@ -20,6 +20,7 @@ const NAV_ITEMS: { href: string; label: string; icon: IconName }[] = [
   { href: '/image-processing', label: 'Image Processing', icon: 'photo' },
   { href: '/notes', label: 'Notes', icon: 'log' },
   { href: '/watchlist', label: 'Watchlist', icon: 'play' },
+  { href: '/date-night', label: 'Date Night', icon: 'heart' },
 ]
 
 // Below `md` this reflows to a plain horizontal bar via Tailwind's

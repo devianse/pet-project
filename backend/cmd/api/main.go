@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/devianse/pet-project/backend/internal/auth"
+	"github.com/devianse/pet-project/backend/internal/datenight"
 	"github.com/devianse/pet-project/backend/internal/db"
 	"github.com/devianse/pet-project/backend/internal/notes"
 	"github.com/devianse/pet-project/backend/internal/watchlist"
@@ -70,6 +71,23 @@ func main() {
 	}
 	watchlistHandler := watchlist.NewHandler(watchlistStore, tmdbClient)
 
+	datenightPairRaw := os.Getenv("DATE_NIGHT_USERNAMES")
+	if datenightPairRaw == "" {
+		logger.Error("DATE_NIGHT_USERNAMES is not set")
+		os.Exit(1)
+	}
+	datenightPair, err := datenight.LoadPair(datenightPairRaw)
+	if err != nil {
+		logger.Error("invalid DATE_NIGHT_USERNAMES", "error", err)
+		os.Exit(1)
+	}
+	datenightStore := datenight.NewStore(conn)
+	if err := datenightStore.EnsureSchema(context.Background()); err != nil {
+		logger.Error("failed to ensure date night schema", "error", err)
+		os.Exit(1)
+	}
+	datenightHandler := datenight.NewHandler(datenightStore)
+
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
 		logger.Error("JWT_SECRET is not set")
@@ -105,6 +123,15 @@ func main() {
 	mux.Handle("POST /api/watchlist", requireAuth(http.HandlerFunc(watchlistHandler.Create)))
 	mux.Handle("PATCH /api/watchlist/{id}", requireAuth(http.HandlerFunc(watchlistHandler.SetViewed)))
 	mux.Handle("DELETE /api/watchlist/{id}", requireAuth(http.HandlerFunc(watchlistHandler.Delete)))
+
+	requirePair := datenight.RequirePair(datenightPair)
+	mux.Handle("GET /api/datenight/activities", requireAuth(requirePair(http.HandlerFunc(datenightHandler.ListActivities))))
+	mux.Handle("POST /api/datenight/activities", requireAuth(requirePair(http.HandlerFunc(datenightHandler.CreateActivity))))
+	mux.Handle("DELETE /api/datenight/activities/{id}", requireAuth(requirePair(http.HandlerFunc(datenightHandler.DeleteActivity))))
+	mux.Handle("GET /api/datenight/proposals", requireAuth(requirePair(http.HandlerFunc(datenightHandler.ListProposals))))
+	mux.Handle("POST /api/datenight/proposals", requireAuth(requirePair(http.HandlerFunc(datenightHandler.CreateProposal))))
+	mux.Handle("POST /api/datenight/proposals/{id}/accept", requireAuth(requirePair(http.HandlerFunc(datenightHandler.AcceptProposal))))
+	mux.Handle("POST /api/datenight/proposals/{id}/decline", requireAuth(requirePair(http.HandlerFunc(datenightHandler.DeclineProposal))))
 
 	port := os.Getenv("PORT")
 	if port == "" {
