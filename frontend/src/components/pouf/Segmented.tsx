@@ -25,11 +25,15 @@ interface SegmentedProps<T extends string> {
  * with no aria-pressed a screen reader announced two identical buttons and no
  * current state.
  *
- * The selected segment is pressed IN — translateY plus the active shadow. That
- * is depth, not hue, so it survives greyscale and any colour vision; and it is
- * the system's existing vocabulary for "engaged", being exactly what every
- * pouf-btn already does on :active. RowCard sets the precedent for aria-pressed
- * as the selection signal.
+ * The selected segment is both pressed IN (translateY plus the active shadow —
+ * the system's existing vocabulary for "engaged", exactly what every pouf-btn
+ * already does on :active) AND filled with the tone colour (`solid`), while
+ * every other option sits outlined and transparent (`quiet`). Depth alone
+ * read as too subtle in practice (a couple of px of shadow, easy to miss at a
+ * glance) — pairing it with a fill/outline swap makes the active option
+ * unmistakable without making colour the *only* signal (still backed by
+ * aria-pressed, so SC 1.4.1 holds). RowCard sets the precedent for
+ * aria-pressed as the selection signal.
  *
  * Generic in T so `<Segmented value={view} .../>` keeps the union ('grid' |
  * 'list') end to end — passing an option this control cannot produce is a
@@ -37,16 +41,17 @@ interface SegmentedProps<T extends string> {
  */
 export function Segmented<T extends string>({ value, onChange, options, label, tone = 'blue' }: SegmentedProps<T>) {
   return (
-    <div className="pouf-seg inline-flex gap-(--s2)" role="group" aria-label={label}>
+    <div className="pouf-seg flex flex-wrap gap-(--s2)" role="group" aria-label={label}>
       {options.map((o) => {
         const on = o.value === value
         return (
           <button
             key={o.value}
             type="button"
-            className={clsx(buttonClasses({ size: 'sm', tone }), /* Pressed IN, not recoloured: depth is the system's word for engaged (SC
-             * 1.4.1 — tone alone vanishes in greyscale). aria-pressed carries it. */
-            'aria-pressed:[transform:translateY(2px)] aria-pressed:cushion-control-active')}
+            className={clsx(
+              buttonClasses({ size: 'sm', tone, variant: on ? 'solid' : 'quiet' }),
+              on && '[transform:translateY(2px)] cushion-control-active',
+            )}
             aria-pressed={on}
             onClick={() => onChange(o.value)}
           >

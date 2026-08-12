@@ -71,8 +71,12 @@ export function DeclineButton({ onDecline }: { onDecline: () => void }) {
     setHoldProgress(0)
   }
 
+  const holdLabel = holdProgress < 0.34 ? HOLD_COPY[0] : holdProgress < 0.67 ? HOLD_COPY[1] : HOLD_COPY[2]
+  const holdFillStyle = {
+    backgroundImage: `linear-gradient(to right, var(--pink) ${holdProgress * 100}%, transparent ${holdProgress * 100}%)`,
+  }
+
   if (isTouch.current) {
-    const holdLabel = holdProgress < 0.34 ? HOLD_COPY[0] : holdProgress < 0.67 ? HOLD_COPY[1] : HOLD_COPY[2]
     return (
       <button
         type="button"
@@ -80,29 +84,46 @@ export function DeclineButton({ onDecline }: { onDecline: () => void }) {
         onPointerDown={startHold}
         onPointerUp={stopHold}
         onPointerLeave={stopHold}
-        style={{
-          backgroundImage: `linear-gradient(to right, var(--pink) ${holdProgress * 100}%, transparent ${holdProgress * 100}%)`,
-        }}
+        style={holdFillStyle}
       >
         {holdProgress > 0 ? holdLabel : 'Decline'}
       </button>
     )
   }
 
-  // Absolute positioning inside a sized container, rather than a
-  // transform: the cushion's own active:translateY press is a transform,
-  // and an inline one would override it every time the button is clicked.
+  // Desktop: dodges the cursor for MAX_DODGES, same as before. Once it
+  // gives up, it doesn't just take a single click — it settles into the
+  // same hold-to-decline gesture as touch, so "give up on dodging" still
+  // doesn't mean "declining is suddenly free". Absolute positioning inside
+  // a sized container, rather than a transform: the cushion's own
+  // active:translateY press is a transform, and an inline one would
+  // override it every time the button is pressed.
+  const settled = dodgeCount >= MAX_DODGES
   return (
     <span ref={containerRef} className="relative block flex-1 min-w-0 h-24">
       <button
         ref={buttonRef}
         type="button"
         className={`${buttonClasses({ tone: 'pink', variant: 'quiet' })} absolute`}
-        onMouseEnter={dodge}
-        onClick={dodgeCount < MAX_DODGES ? dodge : onDecline}
-        style={{ left: offset.x, top: offset.y, transition: 'left 160ms ease, top 160ms ease' }}
+        onMouseEnter={settled ? undefined : dodge}
+        onClick={settled ? undefined : dodge}
+        onPointerDown={settled ? startHold : undefined}
+        onPointerUp={settled ? stopHold : undefined}
+        onPointerLeave={settled ? stopHold : undefined}
+        // Keyboard parity with the pointer hold: browsers auto-repeat
+        // keydown while a key stays pressed and fire one keyup on release,
+        // which is exactly the down/up shape startHold/stopHold expect. The
+        // repeat guard keeps each physical press starting the timer once.
+        onKeyDown={settled ? (e) => { if (!e.repeat) startHold() } : undefined}
+        onKeyUp={settled ? stopHold : undefined}
+        style={{
+          left: offset.x,
+          top: offset.y,
+          transition: 'left 160ms ease, top 160ms ease',
+          ...(settled ? holdFillStyle : {}),
+        }}
       >
-        Decline
+        {settled && holdProgress > 0 ? holdLabel : 'Decline'}
       </button>
     </span>
   )

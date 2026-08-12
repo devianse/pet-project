@@ -62,46 +62,51 @@ export function CalendarGrid({
   })
 
   return (
-    <Card variant="tight">
-      <Row justify="between">
-        <IconButton variant="quiet" size="sm" onClick={goPrevMonth} label="Previous month" icon={<Icon name="prev" />} />
-        <span className="font-black">{monthLabel}</span>
-        <IconButton variant="quiet" size="sm" onClick={goNextMonth} label="Next month" icon={<Icon name="next" />} />
-      </Row>
-      <div className="grid grid-cols-7 gap-(--s1) mt-(--s3)">
-        {WEEKDAY_LABELS.map((label, i) => (
-          <div key={i} className="text-center text-[12px] font-black text-muted">
-            {label}
-          </div>
-        ))}
-        {cells.map((day, i) => {
-          if (day === null) return <div key={i} />
-          const iso = toISODate(viewYear, viewMonth, day)
-          const selected = iso === value
-          // You can't invite someone to last Tuesday.
-          const past = iso < todayISO
-          const isToday = iso === todayISO
-          return (
-            <button
-              key={i}
-              type="button"
-              onClick={() => onChange(iso)}
-              disabled={past}
-              aria-pressed={selected}
-              aria-current={isToday ? 'date' : undefined}
-              className={[
-                'aspect-square rounded-control font-bold text-[14px]',
-                'enabled:cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed',
-                '[transition:transform_140ms_ease] enabled:hover:[transform:scale(1.1)] enabled:active:[transform:scale(0.95)]',
-                selected ? 'bg-purple text-(--on-accent)' : 'bg-bg enabled:hover:cushion-field',
-                isToday && !selected ? '[box-shadow:inset_0_0_0_2px_var(--purple)]' : '',
-              ].join(' ')}
-            >
-              {day}
-            </button>
-          )
-        })}
-      </div>
-    </Card>
+    // Capped and centred: an uncapped Card stretches to the full width of
+    // whatever column it sits in, which on desktop blows the day cells up
+    // to a size way out of proportion with the rest of the form.
+    <div className="w-full max-w-[300px] mx-auto">
+      <Card variant="tight">
+        <Row justify="between">
+          <IconButton variant="quiet" size="sm" onClick={goPrevMonth} label="Previous month" icon={<Icon name="prev" />} />
+          <span className="font-black">{monthLabel}</span>
+          <IconButton variant="quiet" size="sm" onClick={goNextMonth} label="Next month" icon={<Icon name="next" />} />
+        </Row>
+        <div className="grid grid-cols-7 gap-(--s1) mt-(--s3)">
+          {WEEKDAY_LABELS.map((label, i) => (
+            <div key={i} className="text-center text-[12px] font-black text-muted">
+              {label}
+            </div>
+          ))}
+          {cells.map((day, i) => {
+            if (day === null) return <div key={i} />
+            const iso = toISODate(viewYear, viewMonth, day)
+            const selected = iso === value
+            // You can't invite someone to last Tuesday.
+            const past = iso < todayISO
+            const isToday = iso === todayISO
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={() => onChange(iso)}
+                disabled={past}
+                aria-pressed={selected}
+                aria-current={isToday ? 'date' : undefined}
+                className={[
+                  'aspect-square rounded-control font-bold text-[14px]',
+                  'enabled:cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed',
+                  '[transition:transform_140ms_ease] enabled:hover:[transform:scale(1.1)] enabled:active:[transform:scale(0.95)]',
+                  selected ? 'bg-purple text-(--on-accent)' : 'bg-bg enabled:hover:cushion-field',
+                  isToday && !selected ? '[box-shadow:inset_0_0_0_2px_var(--purple)]' : '',
+                ].join(' ')}
+              >
+                {day}
+              </button>
+            )
+          })}
+        </div>
+      </Card>
+    </div>
   )
 }

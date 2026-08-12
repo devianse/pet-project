@@ -62,6 +62,11 @@ export function ActivitiesSheet({
           <Icon name="tag" /> Manage activities
         </Button>
       }
+      onOpenChange={(open) => {
+        // A failed add/remove otherwise sits in state and reappears stale
+        // the next time the sheet opens, even for an unrelated action.
+        if (!open) setError(null)
+      }}
     >
       <Stack gap={4}>
         {error && (
