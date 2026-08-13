@@ -55,11 +55,10 @@ Env config: copy `.env.example` to `.env` in each app's folder and adjust
 as needed.
 
 - `backend/.env.example` — `PORT` the Go server listens on,
-  `TMDB_READ_ACCESS_TOKEN` for the Watchlist feature's TMDb API calls,
-  `DATE_NIGHT_USERNAMES` for the Date Night feature — a `user1,user2`
-  pair naming the two participants, each of which must exactly match
-  (case-sensitive) a seeded account's username. Like
-  `TMDB_READ_ACCESS_TOKEN`, the API refuses to start without it.
+  `TMDB_READ_ACCESS_TOKEN` for the Watchlist feature's TMDb API calls.
+  Per-user feature access (Notes, Watchlist, Date Night, etc.) is granted
+  via `cmd/grantaccess`, not an env var — `admin` accounts bypass gating
+  automatically.
 - `frontend/.env.example` — `API_PROXY_TARGET` (where Vite's dev proxy
   forwards `/api` requests) and `FRONTEND_PORT` (what port Vite itself
   runs on, default 3000)

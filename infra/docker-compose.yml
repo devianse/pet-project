@@ -23,7 +23,6 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
       TMDB_READ_ACCESS_TOKEN: ${TMDB_READ_ACCESS_TOKEN}
       JWT_SECRET: ${JWT_SECRET}
-      DATE_NIGHT_USERNAMES: ${DATE_NIGHT_USERNAMES}
       ENV: production
     depends_on:
       postgres:
