@@ -14,16 +14,17 @@ WebSockets, has NOT started — don't assume it exists. Several small
 features (Notes, design system, pre-deployment security hardening,
 Movie/TV Sharing List, Date Night) have landed ahead of phase 2/3 as
 deliberate detours, alongside a first VPS deployment (live at
-`mikelab.dev`) — see `PLANNING.md`'s "Actual build order so far" section
-for the current sequence, not just the original phase breakdown further
-down that file.
+`mikelab.dev`) — see `planning/history.md` for the current sequence, not
+just the original phase breakdown in `PLANNING.md`.
 
 ## Layout
 
 See `README.md`'s "Layout" section for the directory tree. `docs/`
 already holds design specs (`docs/superpowers/specs/`); `infra/` gets
 its first content (Caddyfile, docker-compose.yml) as part of the
-pre-deployment security hardening work.
+pre-deployment security hardening work. `planning/` holds history/
+decisions/security-TODO notes split out of `PLANNING.md` for size — see
+that file's own pointer table for what's where.
 
 ## Commands
 
