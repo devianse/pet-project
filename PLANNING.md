@@ -179,13 +179,22 @@ Corrected framing from earlier in planning: OCR/photo parsing isn't a shopping-l
   3 resumes, or whether they're built in parallel
 - OCR approach (local Tesseract vs cloud API), if/when Image Processing gets built — not needed until that project is actually underway
 - Full phased implementation plan (SPEC-style, layer by layer like URL Shortener) for the shell first, then the shopping-list project — not written yet; next step should go through `superpowers:brainstorming` properly before that gets written, per standing skill-usage rules
-- **Fine-grained per-user permissions**, deferred during the JWT auth
-  brainstorm — the current `admin`/`user` role split is enough for "I
-  want to see some things other users can't at all," but the eventual
-  want is explicit feature-to-user gating (e.g. "user X can see feature
-  Y, user Z can't") rather than a role bucket. Not designed yet; a
-  likely later addition (a permissions table) that shouldn't require
-  touching the auth core when it happens.
+- ~~Fine-grained per-user permissions~~ — designed, not yet implemented:
+  see `docs/superpowers/specs/2026-08-13-feature-visibility-design.md`.
+  A `features`/`feature_access` table pair plus a `RequireFeature`
+  backend middleware and frontend route guard, granted per user via a
+  new `cmd/grantaccess` CLI (same pattern as `cmd/createuser`); `admin`
+  bypasses automatically. Also retires Date Night's bespoke
+  `DATE_NIGHT_USERNAMES` env var onto the same mechanism. That design
+  explicitly deferred three follow-ups, not designed yet:
+  - **Expanding `/api/me`** beyond adding a `features` field —
+    `created_at`/`last_login_at`/other profile info later, once
+    something actually needs it.
+  - **`display_name` write path** — the column exists and is
+    read/returned everywhere already, but nothing ever writes it
+    (`cmd/createuser` doesn't take one, no update endpoint exists), so
+    it's always `NULL` in practice today.
+  - **Admin web UI for managing grants** — CLI-only for now.
 - **Browser-level verification of the JWT auth frontend flow**
   (login/logout/redirect actually rendering and working, not just
   passing code review + a curl-proven backend) — not done as of the
