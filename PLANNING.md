@@ -53,7 +53,7 @@ matches the shell-first order above one-for-one:
    record pointed at the VPS, `docker compose up -d --build`. Caddy
    obtained a real Let's Encrypt cert automatically, all 3 containers
    healthy on first boot. Full step-by-step in
-   `infra/DEPLOYMENT_RUNBOOK.local.md` — written to make the Timeweb move a
+   `infra/deployment-runbook/` — written to make the Timeweb move a
    checklist, not a from-scratch redo. One real bug caught and fixed
    during this pass: `infra/docker-compose.yml` wasn't passing
    `TMDB_READ_ACCESS_TOKEN` into the backend container at all (backend
@@ -122,7 +122,7 @@ Both are viable "barebones" options at this scale (2GB RAM comfortably runs all 
 
 **Revised during actual provisioning (2026-08-09)**: crypto top-up into Cloudzy carries a real cost the original comparison missed — ~12% conversion + a flat ~$3.5 fee per payment — which erodes Cloudzy's price edge once that's counted. Timeweb also turned out to offer a Netherlands region (not just Moscow/SPb), which gets the same low-latency-from-Russia benefit as Cloudzy's Frankfurt option while keeping Timeweb's fee-free domestic card/SBP payment — collapsing the tradeoff the original table was built around.
 
-**Current plan**: the first deployment (see build-order step 6 above) runs on **Cloudzy, Frankfurt, hourly billing**, deliberately treated as a ~3-week paid trial funded by an already-deposited $10 balance — not the permanent home. Once that runs out, **move to Timeweb (Netherlands)** for the ongoing recurring hosting, using `infra/DEPLOYMENT_RUNBOOK.local.md` as the checklist (same Docker Compose stack, so it's a redo of the OS-level steps — hardening, Docker install — plus a deliberate Postgres `pg_dump`/restore and a DNS cutover, not a from-scratch rebuild).
+**Current plan**: the first deployment (see build-order step 6 above) runs on **Cloudzy, Frankfurt, hourly billing**, deliberately treated as a ~3-week paid trial funded by an already-deposited $10 balance — not the permanent home. Once that runs out, **move to Timeweb (Netherlands)** for the ongoing recurring hosting, using `infra/deployment-runbook/` as the checklist (same Docker Compose stack, so it's a redo of the OS-level steps — hardening, Docker install — plus a deliberate Postgres `pg_dump`/restore and a DNS cutover, not a from-scratch rebuild).
 
 Domain: **`mikelab.dev`**, bought on reg.ru, 1-year registration (chose 1-year over 2-year prepay since renewal is low-friction and 2-year prepay only insures against a price hike that isn't guaranteed).
 
