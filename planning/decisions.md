@@ -49,6 +49,17 @@ the framing and roadmap these decisions feed into.
   meant to be a cross-cutting platform feature (see `PLANNING.md`'s
   "Platform shell" section), needed before Shopping List's live-sync
   core loop or Date Night's deferred live-update follow-up can land.
+- **Telegram bot integration** — not started, design approved and
+  spec'd: `docs/superpowers/specs/2026-08-14-telegram-bot-design.md`.
+  Another cross-cutting platform capability like WebSockets (see
+  `PLANNING.md`'s "Platform shell" section) — two-way (commands in,
+  notifications out), single-owner for v1, hand-rolled (no new
+  dependency), long-polling not webhook. v1 closes Date Night's
+  already-deferred "notify on propose/accept/decline" gap and adds
+  `/notes` + `/newnote` commands. Motivated by a later goal — a
+  financial-subscription tracker (renewal-due notifications, spend
+  totals) — that's explicitly out of scope for this spec and gets its
+  own design once this lands.
 - **Which of Shopping List / Image Processing** gets built first once
   phase 3 resumes, or whether they're built in parallel.
 - **OCR approach** (local Tesseract vs cloud API), if/when Image
