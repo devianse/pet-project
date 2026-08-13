@@ -19,6 +19,7 @@ import (
 func main() {
 	username := flag.String("username", "", "username for the new account (required)")
 	role := flag.String("role", "user", `account role: "admin" or "user"`)
+	displayName := flag.String("display-name", "", "optional display name shown in the UI instead of the username")
 	flag.Parse()
 
 	if *username == "" {
@@ -58,7 +59,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := createUser(context.Background(), store, *username, password, *role); err != nil {
+	if err := createUser(context.Background(), store, *username, password, *role, *displayName); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
@@ -69,13 +70,20 @@ func main() {
 // createUser hashes the password and inserts the row, translating a
 // unique-constraint violation into a clear message instead of a raw
 // pgconn error. Split out from main so it's testable without stdin.
-func createUser(ctx context.Context, store *auth.Store, username, password, role string) error {
+// displayName is optional — an empty string stores NULL, same as
+// omitting it from the self-service PATCH /api/me endpoint.
+func createUser(ctx context.Context, store *auth.Store, username, password, role, displayName string) error {
 	hash, err := auth.HashPassword(password)
 	if err != nil {
 		return fmt.Errorf("hashing password: %w", err)
 	}
 
-	if _, err := store.CreateUser(ctx, username, hash, role); err != nil {
+	var displayNamePtr *string
+	if trimmed := strings.TrimSpace(displayName); trimmed != "" {
+		displayNamePtr = &trimmed
+	}
+
+	if _, err := store.CreateUserWithDisplayName(ctx, username, hash, role, displayNamePtr); err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			return fmt.Errorf("username %q already exists", username)

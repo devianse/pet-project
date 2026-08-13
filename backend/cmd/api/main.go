@@ -116,6 +116,7 @@ func main() {
 	mux.Handle("POST /api/auth/login", rateLimitMiddleware(loginLimiter, http.HandlerFunc(authHandler.Login)))
 	mux.HandleFunc("POST /api/auth/logout", authHandler.Logout)
 	mux.HandleFunc("GET /api/me", authHandler.Me)
+	mux.HandleFunc("PATCH /api/me", authHandler.UpdateMe)
 	mux.Handle("GET /api/notes", requireAuth(requireFeature("notes")(http.HandlerFunc(notesHandler.List))))
 	mux.Handle("POST /api/notes", requireAuth(requireFeature("notes")(http.HandlerFunc(notesHandler.Create))))
 	mux.Handle("DELETE /api/notes/{id}", requireAuth(requireFeature("notes")(http.HandlerFunc(notesHandler.Delete))))

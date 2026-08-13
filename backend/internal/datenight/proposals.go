@@ -157,7 +157,7 @@ func parseMoods(raw string) []Mood {
 func (s *Store) ListProposals(ctx context.Context) ([]Proposal, error) {
 	rows, err := s.conn.QueryContext(ctx, `
 		SELECT p.id, p.activity_id, p.date, p.time_slot, p.energy_level, p.moods, p.status,
-		       p.proposed_by_user_id, COALESCE(u.username, 'someone'), p.created_at
+		       p.proposed_by_user_id, COALESCE(u.display_name, u.username, 'someone'), p.created_at
 		FROM date_night_proposals p
 		LEFT JOIN users u ON u.id = p.proposed_by_user_id
 		ORDER BY p.created_at DESC, p.id DESC
@@ -190,7 +190,7 @@ func (s *Store) CreateProposal(ctx context.Context, activityID int64, date time.
 			RETURNING id, activity_id, date, time_slot, energy_level, moods, status, proposed_by_user_id, created_at
 		)
 		SELECT i.id, i.activity_id, i.date, i.time_slot, i.energy_level, i.moods, i.status,
-		       i.proposed_by_user_id, COALESCE(u.username, 'someone'), i.created_at
+		       i.proposed_by_user_id, COALESCE(u.display_name, u.username, 'someone'), i.created_at
 		FROM inserted i
 		LEFT JOIN users u ON u.id = i.proposed_by_user_id
 	`, activityID, date, slot, energy, joinMoods(moods), proposedByUserID).
@@ -224,7 +224,7 @@ func (s *Store) SetProposalStatus(ctx context.Context, id int64, status Proposal
 			RETURNING id, activity_id, date, time_slot, energy_level, moods, status, proposed_by_user_id, created_at
 		)
 		SELECT up.id, up.activity_id, up.date, up.time_slot, up.energy_level, up.moods, up.status,
-		       up.proposed_by_user_id, COALESCE(u.username, 'someone'), up.created_at
+		       up.proposed_by_user_id, COALESCE(u.display_name, u.username, 'someone'), up.created_at
 		FROM updated up
 		LEFT JOIN users u ON u.id = up.proposed_by_user_id
 	`, id, status, respondingUserID).

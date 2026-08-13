@@ -38,12 +38,19 @@ export async function getHealth(): Promise<{ status: string }> {
 // language boundary.
 export type FeatureKey = 'notes' | 'watchlist' | 'date-night' | 'shopping-list' | 'image-processing'
 
+// Kept in sync with backend/internal/auth/handlers.go's allowedAvatarColors
+// — the six pouf "brand" tones meant for user-facing color choices (not
+// the semantic up/down/warn/info/idle tones reserved for status).
+export type AvatarTone = 'pink' | 'purple' | 'blue' | 'mint' | 'yellow' | 'orange'
+
 export type User = {
   id: number
   username: string
   display_name: string | null
+  avatar_color: AvatarTone | null
   role: 'admin' | 'user'
   features: FeatureKey[]
+  created_at: string
 }
 
 export async function getMe(): Promise<User | null> {
@@ -53,6 +60,21 @@ export async function getMe(): Promise<User | null> {
   }
   if (!res.ok) {
     throw new Error(`failed to load session: ${res.status}`)
+  }
+  return res.json()
+}
+
+// A full replace of both fields, not a partial patch — see
+// backend/internal/auth/handlers.go's UpdateMe doc comment. Callers
+// resend the field they're not changing from the current user state.
+export async function updateMe(input: { display_name: string | null; avatar_color: AvatarTone | null }): Promise<User> {
+  const res = await request('/api/me', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!res.ok) {
+    throw new Error(`failed to update profile: ${res.status}`)
   }
   return res.json()
 }

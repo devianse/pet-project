@@ -92,6 +92,25 @@ matches the shell-first order above one-for-one:
    deferred in its own spec. See
    `docs/superpowers/specs/2026-08-12-date-night-design.md` and
    `docs/superpowers/plans/2026-08-12-date-night.md`.
+10. **User profile / `/api/me` QOL** (done) — closed the `display_name`
+    write path left open by the feature-visibility design: a
+    `PATCH /api/me` endpoint (full-replace semantics — the frontend
+    always resends both fields) plus a `cmd/createuser -display-name`
+    flag, and a new user-editable `avatar_color` column (one of six
+    pouf "brand" tones). Frontend gained an avatar-triggered popover
+    (hand-authored over raw `@radix-ui/react-popover`, since pouf's own
+    `DropdownMenu` only supports static click rows) replacing
+    `AppShell`'s old plain username+logout block — editable display
+    name, read-only `@username`, "member since" date, an avatar-color
+    swatch picker, logout. Deliberately skipped speculative fields
+    (email, timezone, bio/status, avatar image upload) as YAGNI. Minor
+    intersection fixed at the same time: Date Night's "proposed by"
+    label now prefers `display_name` over `username` (`COALESCE(u.
+    display_name, u.username, 'someone')` in `internal/datenight/
+    proposals.go`), keeping the `proposed_by_username` field name as-is
+    since only the resolved value changed. No design doc — scoped and
+    approved conversationally as a bounded QOL pass, not an
+    architectural change.
 
 ## Platform shell — what gets built first
 
@@ -191,8 +210,9 @@ Corrected framing from earlier in planning: OCR/photo parsing isn't a shopping-l
   trusting a possibly-stale JWT claim — closes the window where a
   demoted admin kept bypass access until their token expired). Also
   retired Date Night's bespoke `DATE_NIGHT_USERNAMES` env var onto the
-  same mechanism. That design explicitly deferred two follow-ups, still
-  genuinely open — see "Still open" below.
+  same mechanism. That design explicitly deferred two follow-ups; one
+  (`display_name` write path) is now resolved — see build-order step 10
+  above — the other (admin web UI for grants) is still open below.
 
 ### Still open
 
@@ -206,10 +226,6 @@ Corrected framing from earlier in planning: OCR/photo parsing isn't a shopping-l
   not written yet; next step should go through
   `superpowers:brainstorming` properly before that gets written, per
   standing skill-usage rules.
-- **`display_name` write path** (deferred by the feature-visibility
-  design) — the column exists and is read/returned everywhere already,
-  but nothing ever writes it (`cmd/createuser` doesn't take one, no
-  update endpoint exists), so it's always `NULL` in practice today.
 - **Admin web UI for managing grants** (deferred by the same design) —
   CLI-only (`cmd/grantaccess`) for now.
 - **Browser-level verification of the JWT auth frontend flow**

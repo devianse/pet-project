@@ -135,3 +135,49 @@ func TestStore_CreateUser_RejectsDuplicateUsername(t *testing.T) {
 		t.Fatal("expected an error creating a user with a duplicate username")
 	}
 }
+
+func TestStore_CreateUserWithDisplayName(t *testing.T) {
+	store, _ := setupStore(t)
+	ctx := context.Background()
+
+	name := "Mike K"
+	created, err := store.CreateUserWithDisplayName(ctx, "mike", "hashed-password", "admin", &name)
+	if err != nil {
+		t.Fatalf("CreateUserWithDisplayName: %v", err)
+	}
+	if created.DisplayName == nil || *created.DisplayName != "Mike K" {
+		t.Fatalf("expected display_name %q, got %v", name, created.DisplayName)
+	}
+}
+
+func TestStore_UpdateProfile(t *testing.T) {
+	store, _ := setupStore(t)
+	ctx := context.Background()
+
+	created, err := store.CreateUser(ctx, "mike", "hashed-password", "user")
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	name := "Mike K"
+	color := "mint"
+	updated, err := store.UpdateProfile(ctx, created.ID, &name, &color)
+	if err != nil {
+		t.Fatalf("UpdateProfile: %v", err)
+	}
+	if updated.DisplayName == nil || *updated.DisplayName != "Mike K" {
+		t.Fatalf("expected display_name %q, got %v", name, updated.DisplayName)
+	}
+	if updated.AvatarColor == nil || *updated.AvatarColor != "mint" {
+		t.Fatalf("expected avatar_color %q, got %v", color, updated.AvatarColor)
+	}
+
+	// Clearing both back to NULL.
+	cleared, err := store.UpdateProfile(ctx, created.ID, nil, nil)
+	if err != nil {
+		t.Fatalf("UpdateProfile (clear): %v", err)
+	}
+	if cleared.DisplayName != nil || cleared.AvatarColor != nil {
+		t.Fatalf("expected both fields cleared, got %+v", cleared)
+	}
+}

@@ -245,6 +245,132 @@ func TestHandler_Me_Features_Admin(t *testing.T) {
 	}
 }
 
+func TestHandler_UpdateMe_Success(t *testing.T) {
+	handler, store, _ := newTestHandler(t)
+	user, err := store.CreateUser(context.Background(), "mike", "password123", "user")
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	token, err := SignToken([]byte("test-secret"), user.ID, "mike", "user")
+	if err != nil {
+		t.Fatalf("SignToken: %v", err)
+	}
+
+	body, _ := json.Marshal(updateMeRequest{DisplayName: strPtr("Mike K"), AvatarColor: strPtr("mint")})
+	req := httptest.NewRequest(http.MethodPatch, "/api/me", bytes.NewReader(body))
+	req.AddCookie(&http.Cookie{Name: cookieName, Value: token})
+	rec := httptest.NewRecorder()
+
+	handler.UpdateMe(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp meResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decoding response: %v", err)
+	}
+	if resp.DisplayName == nil || *resp.DisplayName != "Mike K" {
+		t.Fatalf("expected display_name %q, got %v", "Mike K", resp.DisplayName)
+	}
+	if resp.AvatarColor == nil || *resp.AvatarColor != "mint" {
+		t.Fatalf("expected avatar_color %q, got %v", "mint", resp.AvatarColor)
+	}
+}
+
+func TestHandler_UpdateMe_TrimsAndClearsBlankDisplayName(t *testing.T) {
+	handler, store, _ := newTestHandler(t)
+	user, err := store.CreateUser(context.Background(), "mike", "password123", "user")
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	token, err := SignToken([]byte("test-secret"), user.ID, "mike", "user")
+	if err != nil {
+		t.Fatalf("SignToken: %v", err)
+	}
+
+	body, _ := json.Marshal(updateMeRequest{DisplayName: strPtr("   ")})
+	req := httptest.NewRequest(http.MethodPatch, "/api/me", bytes.NewReader(body))
+	req.AddCookie(&http.Cookie{Name: cookieName, Value: token})
+	rec := httptest.NewRecorder()
+
+	handler.UpdateMe(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp meResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decoding response: %v", err)
+	}
+	if resp.DisplayName != nil {
+		t.Fatalf("expected a blank display_name to clear to nil, got %v", *resp.DisplayName)
+	}
+}
+
+func TestHandler_UpdateMe_RejectsTooLongDisplayName(t *testing.T) {
+	handler, store, _ := newTestHandler(t)
+	user, err := store.CreateUser(context.Background(), "mike", "password123", "user")
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	token, err := SignToken([]byte("test-secret"), user.ID, "mike", "user")
+	if err != nil {
+		t.Fatalf("SignToken: %v", err)
+	}
+
+	tooLong := strPtr(string(make([]byte, 61)))
+	body, _ := json.Marshal(updateMeRequest{DisplayName: tooLong})
+	req := httptest.NewRequest(http.MethodPatch, "/api/me", bytes.NewReader(body))
+	req.AddCookie(&http.Cookie{Name: cookieName, Value: token})
+	rec := httptest.NewRecorder()
+
+	handler.UpdateMe(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rec.Code)
+	}
+}
+
+func TestHandler_UpdateMe_RejectsUnknownAvatarColor(t *testing.T) {
+	handler, store, _ := newTestHandler(t)
+	user, err := store.CreateUser(context.Background(), "mike", "password123", "user")
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	token, err := SignToken([]byte("test-secret"), user.ID, "mike", "user")
+	if err != nil {
+		t.Fatalf("SignToken: %v", err)
+	}
+
+	body, _ := json.Marshal(updateMeRequest{AvatarColor: strPtr("chartreuse")})
+	req := httptest.NewRequest(http.MethodPatch, "/api/me", bytes.NewReader(body))
+	req.AddCookie(&http.Cookie{Name: cookieName, Value: token})
+	rec := httptest.NewRecorder()
+
+	handler.UpdateMe(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rec.Code)
+	}
+}
+
+func TestHandler_UpdateMe_WithoutCookie(t *testing.T) {
+	handler, _, _ := newTestHandler(t)
+
+	body, _ := json.Marshal(updateMeRequest{DisplayName: strPtr("Mike K")})
+	req := httptest.NewRequest(http.MethodPatch, "/api/me", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.UpdateMe(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", rec.Code)
+	}
+}
+
+func strPtr(s string) *string { return &s }
+
 func TestHandler_Me_Features_UserWithGrant(t *testing.T) {
 	handler, store, features := newTestHandler(t)
 	user, err := store.CreateUser(context.Background(), "bob", "password123", "user")
