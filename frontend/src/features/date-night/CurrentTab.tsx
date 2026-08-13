@@ -15,7 +15,7 @@ import { Stack, Row } from '@/components/pouf/layout'
 import { ProposeForm } from './ProposeForm'
 import { DeclineButton } from './DeclineButton'
 import { celebrateAccept } from './confetti'
-import { formatProposalDate, TIME_SLOT_LABEL } from './format'
+import { formatProposalDate, TIME_SLOT_LABEL, ENERGY_LABEL, MOOD_LABEL } from './format'
 
 const STATUS_LABEL: Record<DateNightProposal['status'], string> = {
   pending: 'Waiting for a response',
@@ -102,6 +102,22 @@ export function CurrentTab({
             <span className="font-bold">
               {formatProposalDate(current.date)} · {TIME_SLOT_LABEL[current.time_slot]}
             </span>
+
+            <span className="text-[13px]">{ENERGY_LABEL[current.energy_level]}</span>
+
+            <Row wrap gap={1}>
+              {current.moods.map((mood) => (
+                <span
+                  key={mood}
+                  className="font-bold text-[12px] bg-pink/10 text-pink rounded-full px-2 py-1"
+                >
+                  {MOOD_LABEL[mood]}
+                </span>
+              ))}
+            </Row>
+
+            <span className="text-[13px] text-muted">{current.proposed_by_username} proposed</span>
+
             {current.status === 'pending' && user && current.proposed_by_user_id !== user.id && (
               <Row gap={3}>
                 <Button onClick={accept} tone="mint">
