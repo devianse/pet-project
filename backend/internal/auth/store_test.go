@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"database/sql"
 	"os"
 	"testing"
 
@@ -20,7 +21,7 @@ import (
 // versa) regardless of whether the fixture usernames themselves
 // collide. Deleting only this package's own known fixture usernames
 // keeps the two packages' tests from ever touching each other's rows.
-func setupStore(t *testing.T) *Store {
+func setupStore(t *testing.T) (*Store, *sql.DB) {
 	t.Helper()
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
@@ -41,11 +42,11 @@ func setupStore(t *testing.T) *Store {
 		"DELETE FROM users WHERE username IN ('mike', 'alice', 'bob', 'dupe')"); err != nil {
 		t.Fatalf("clearing users table: %v", err)
 	}
-	return store
+	return store, conn
 }
 
 func TestStore_CreateUserThenFindByUsername(t *testing.T) {
-	store := setupStore(t)
+	store, _ := setupStore(t)
 	ctx := context.Background()
 
 	created, err := store.CreateUser(ctx, "mike", "hashed-password", "admin")
@@ -69,7 +70,7 @@ func TestStore_CreateUserThenFindByUsername(t *testing.T) {
 }
 
 func TestStore_FindByUsername_NotFound(t *testing.T) {
-	store := setupStore(t)
+	store, _ := setupStore(t)
 
 	found, err := store.FindByUsername(context.Background(), "nobody")
 	if err != nil {
@@ -81,7 +82,7 @@ func TestStore_FindByUsername_NotFound(t *testing.T) {
 }
 
 func TestStore_FindByID(t *testing.T) {
-	store := setupStore(t)
+	store, _ := setupStore(t)
 	ctx := context.Background()
 
 	created, err := store.CreateUser(ctx, "alice", "hashed-password", "user")
@@ -99,7 +100,7 @@ func TestStore_FindByID(t *testing.T) {
 }
 
 func TestStore_UpdateLastLogin(t *testing.T) {
-	store := setupStore(t)
+	store, _ := setupStore(t)
 	ctx := context.Background()
 
 	created, err := store.CreateUser(ctx, "bob", "hashed-password", "user")
@@ -124,7 +125,7 @@ func TestStore_UpdateLastLogin(t *testing.T) {
 }
 
 func TestStore_CreateUser_RejectsDuplicateUsername(t *testing.T) {
-	store := setupStore(t)
+	store, _ := setupStore(t)
 	ctx := context.Background()
 
 	if _, err := store.CreateUser(ctx, "dupe", "hashed-password", "user"); err != nil {

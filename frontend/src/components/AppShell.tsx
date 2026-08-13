@@ -5,6 +5,7 @@ import type { IconName } from '@/components/pouf/Icon'
 import { Button } from '@/components/pouf/Button'
 import { ThemeToggle } from './ThemeToggle'
 import { useAuth } from '@/shared/auth'
+import type { FeatureKey } from '@/shared/api'
 
 // pouf's NavLink takes a router-agnostic `href` prop; this adapts it to
 // react-router-dom's `Link`, which wants `to` instead.
@@ -14,13 +15,13 @@ const RouterLinkAdapter: LinkComponent = ({ href, children, ...rest }) => (
   </Link>
 )
 
-const NAV_ITEMS: { href: string; label: string; icon: IconName }[] = [
+const NAV_ITEMS: { href: string; label: string; icon: IconName; feature?: FeatureKey }[] = [
   { href: '/', label: 'Home', icon: 'home' },
-  { href: '/shopping-list', label: 'Shopping List', icon: 'cart' },
-  { href: '/image-processing', label: 'Image Processing', icon: 'photo' },
-  { href: '/notes', label: 'Notes', icon: 'log' },
-  { href: '/watchlist', label: 'Watchlist', icon: 'play' },
-  { href: '/date-night', label: 'Date Night', icon: 'heart' },
+  { href: '/shopping-list', label: 'Shopping List', icon: 'cart', feature: 'shopping-list' },
+  { href: '/image-processing', label: 'Image Processing', icon: 'photo', feature: 'image-processing' },
+  { href: '/notes', label: 'Notes', icon: 'log', feature: 'notes' },
+  { href: '/watchlist', label: 'Watchlist', icon: 'play', feature: 'watchlist' },
+  { href: '/date-night', label: 'Date Night', icon: 'heart', feature: 'date-night' },
 ]
 
 // Below `md` this reflows to a plain horizontal bar via Tailwind's
@@ -31,6 +32,7 @@ const NAV_ITEMS: { href: string; label: string; icon: IconName }[] = [
 export function AppShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
   const { user, logout } = useAuth()
+  const visibleNavItems = NAV_ITEMS.filter((item) => !item.feature || user?.features.includes(item.feature))
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row bg-bg text-ink">
@@ -41,7 +43,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="hidden md:block px-2 pb-2 font-black text-lg text-ink">
           pet-projects
         </div>
-        {NAV_ITEMS.map((item) => (
+        {visibleNavItems.map((item) => (
           <NavLink
             key={item.href}
             href={item.href}

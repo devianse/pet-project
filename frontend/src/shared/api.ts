@@ -32,11 +32,18 @@ export async function getHealth(): Promise<{ status: string }> {
   return res.json()
 }
 
+// Hand-kept in sync with backend/internal/access/features.go's
+// KnownFeatures — same duplication route paths already have between
+// cmd/api/main.go and App.tsx, no shared source of truth across the
+// language boundary.
+export type FeatureKey = 'notes' | 'watchlist' | 'date-night' | 'shopping-list' | 'image-processing'
+
 export type User = {
   id: number
   username: string
   display_name: string | null
   role: 'admin' | 'user'
+  features: FeatureKey[]
 }
 
 export async function getMe(): Promise<User | null> {
@@ -197,10 +204,11 @@ export type DateNightProposals = {
   history: DateNightProposal[]
 }
 
-// The datenight routes 403 any account outside DATE_NIGHT_USERNAMES.
-// Until the per-user page-visibility system exists (see CLAUDE.md's
-// "Current phase"), the nav entry is visible to everyone, so this is a
-// state the page has to render deliberately rather than as a failure.
+// The datenight routes 403 any account not granted the "date-night"
+// feature (backend/internal/access) — RequireFeature in App.tsx and the
+// nav filtering in AppShell.tsx keep this from being reachable in the
+// UI at all for most accounts, but this class still exists as the
+// server-side signal a direct/stale request can hit.
 export class DateNightForbiddenError extends Error {
   constructor() {
     super('this account is not part of the pair')

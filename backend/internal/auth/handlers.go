@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -8,14 +9,26 @@ import (
 	"github.com/devianse/pet-project/backend/internal/platform"
 )
 
+// FeatureLister is the one thing Handler needs from package access to
+// populate meResponse.Features. Defined here (not imported from access)
+// so package auth never imports package access — access.RequireFeature
+// already imports auth for ClaimsFromContext, and auth importing access
+// back would cycle. access.Store satisfies this interface structurally;
+// only cmd/api/main.go and test files need to import both packages to
+// wire the concrete type in.
+type FeatureLister interface {
+	ListAllForUser(ctx context.Context, userID int64, role string) ([]string, error)
+}
+
 type Handler struct {
 	store         *Store
 	secret        []byte
 	secureCookies bool
+	features      FeatureLister
 }
 
-func NewHandler(store *Store, secret []byte, secureCookies bool) *Handler {
-	return &Handler{store: store, secret: secret, secureCookies: secureCookies}
+func NewHandler(store *Store, secret []byte, secureCookies bool, features FeatureLister) *Handler {
+	return &Handler{store: store, secret: secret, secureCookies: secureCookies, features: features}
 }
 
 type loginRequest struct {
@@ -24,10 +37,11 @@ type loginRequest struct {
 }
 
 type meResponse struct {
-	ID          int64   `json:"id"`
-	Username    string  `json:"username"`
-	DisplayName *string `json:"display_name"`
-	Role        string  `json:"role"`
+	ID          int64    `json:"id"`
+	Username    string   `json:"username"`
+	DisplayName *string  `json:"display_name"`
+	Role        string   `json:"role"`
+	Features    []string `json:"features"`
 }
 
 // dummyHash is a valid bcrypt hash of no real password. Used to make
@@ -35,6 +49,24 @@ type meResponse struct {
 // closing a timing side-channel that would otherwise let a caller
 // distinguish "unknown username" from "wrong password" by response time.
 const dummyHash = "$2a$10$CwTycUXWue0Thq9StjUM0uJ8G8xtObW/gxSbeMhWaBaFTUKtBBWnu"
+
+// buildMeResponse resolves the caller's feature set and assembles the
+// shared response shape both Login and Me return — kept in one place so
+// the two paths can't silently drift into reporting different fields for
+// the same user.
+func (h *Handler) buildMeResponse(ctx context.Context, user *User) (meResponse, error) {
+	features, err := h.features.ListAllForUser(ctx, user.ID, user.Role)
+	if err != nil {
+		return meResponse{}, err
+	}
+	return meResponse{
+		ID:          user.ID,
+		Username:    user.Username,
+		DisplayName: user.DisplayName,
+		Role:        user.Role,
+		Features:    features,
+	}, nil
+}
 
 // Login authenticates a username/password pair and, on success, sets the
 // session cookie. Every failure path (unknown username, wrong password)
@@ -78,7 +110,13 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		slog.Error("update last login", "error", err)
 	}
 
-	platform.WriteJSON(w, http.StatusOK, meResponse{ID: user.ID, Username: user.Username, DisplayName: user.DisplayName, Role: user.Role})
+	resp, err := h.buildMeResponse(r.Context(), user)
+	if err != nil {
+		slog.Error("building me response", "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	platform.WriteJSON(w, http.StatusOK, resp)
 }
 
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
@@ -110,5 +148,11 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	platform.WriteJSON(w, http.StatusOK, meResponse{ID: user.ID, Username: user.Username, DisplayName: user.DisplayName, Role: user.Role})
+	resp, err := h.buildMeResponse(r.Context(), user)
+	if err != nil {
+		slog.Error("building me response", "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	platform.WriteJSON(w, http.StatusOK, resp)
 }
