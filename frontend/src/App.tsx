@@ -9,6 +9,7 @@ import DateNightPage from './features/date-night/Page'
 import LoginPage from './features/auth/Page'
 import { AppShell } from './components/AppShell'
 import { AuthProvider, useAuth } from './shared/auth'
+import type { FeatureKey } from './shared/api'
 
 // Whole app is gated behind login (per the auth design spec — "everything").
 // /login is the one route outside RequireAuth; everything else redirects
@@ -26,6 +27,18 @@ function RequireAuth({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
+// Feature-gated routes redirect to / (not /login) — the page simply
+// isn't there for this person, not an auth failure. This is convenience
+// on top of the real server-side gate (access.RequireFeature 403s the
+// underlying API calls regardless of what the UI shows).
+function RequireFeature({ feature, children }: { feature: FeatureKey; children: ReactNode }) {
+  const { user } = useAuth()
+  if (!user || !user.features.includes(feature)) {
+    return <Navigate to="/" replace />
+  }
+  return <>{children}</>
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -39,11 +52,46 @@ export default function App() {
                 <AppShell>
                   <Routes>
                     <Route path="/" element={<HomePage />} />
-                    <Route path="/shopping-list" element={<ShoppingListPage />} />
-                    <Route path="/image-processing" element={<ImageProcessingPage />} />
-                    <Route path="/notes" element={<NotesPage />} />
-                    <Route path="/watchlist" element={<WatchlistPage />} />
-                    <Route path="/date-night" element={<DateNightPage />} />
+                    <Route
+                      path="/shopping-list"
+                      element={
+                        <RequireFeature feature="shopping-list">
+                          <ShoppingListPage />
+                        </RequireFeature>
+                      }
+                    />
+                    <Route
+                      path="/image-processing"
+                      element={
+                        <RequireFeature feature="image-processing">
+                          <ImageProcessingPage />
+                        </RequireFeature>
+                      }
+                    />
+                    <Route
+                      path="/notes"
+                      element={
+                        <RequireFeature feature="notes">
+                          <NotesPage />
+                        </RequireFeature>
+                      }
+                    />
+                    <Route
+                      path="/watchlist"
+                      element={
+                        <RequireFeature feature="watchlist">
+                          <WatchlistPage />
+                        </RequireFeature>
+                      }
+                    />
+                    <Route
+                      path="/date-night"
+                      element={
+                        <RequireFeature feature="date-night">
+                          <DateNightPage />
+                        </RequireFeature>
+                      }
+                    />
                   </Routes>
                 </AppShell>
               </RequireAuth>
