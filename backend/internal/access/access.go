@@ -114,14 +114,38 @@ func (s *Store) ListAllForUser(ctx context.Context, userID int64, role string) (
 }
 
 // HasFeature is the single-feature check RequireFeature's middleware
-// uses. admin short-circuits to true without touching the DB.
+// uses. role comes from the caller's JWT claims, which can be stale for
+// the lifetime of the token — so an admin claim only short-circuits to
+// true after currentRole confirms the DB still says admin. A demoted
+// user's very next request loses the bypass, no re-login required. Non-
+// admin claims skip that extra query entirely and go straight to the
+// feature_access check, which already re-reads the DB every time.
 func HasFeature(ctx context.Context, store *Store, userID int64, role, key string) (bool, error) {
 	if role == "admin" {
-		return true, nil
+		stillAdmin, err := store.currentRole(ctx, userID)
+		if err != nil {
+			return false, err
+		}
+		if stillAdmin == "admin" {
+			return true, nil
+		}
 	}
 	var exists bool
 	err := store.conn.QueryRowContext(ctx, `
 		SELECT EXISTS(SELECT 1 FROM feature_access WHERE user_id = $1 AND feature_key = $2)
 	`, userID, key).Scan(&exists)
 	return exists, err
+}
+
+// currentRole reads a user's role fresh from the users table — the same
+// re-check /api/me already does by loading the full user row. Used to
+// verify an "admin" JWT claim is still true before letting it bypass a
+// feature gate.
+func (s *Store) currentRole(ctx context.Context, userID int64) (string, error) {
+	var role string
+	err := s.conn.QueryRowContext(ctx, `SELECT role FROM users WHERE id = $1`, userID).Scan(&role)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return role, err
 }

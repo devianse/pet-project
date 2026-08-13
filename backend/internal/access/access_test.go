@@ -3,7 +3,6 @@ package access
 
 import (
 	"context"
-	"database/sql"
 	"os"
 	"testing"
 
@@ -207,4 +206,37 @@ func TestHasFeature(t *testing.T) {
 	}
 }
 
-var _ = sql.ErrNoRows // keep database/sql import even if unused directly above
+// TestHasFeature_DemotedAdminLosesBypassImmediately guards the gap a stale
+// JWT claim would otherwise leave open: an "admin" claims.Role that's no
+// longer true in the DB must not bypass gating, even though the token
+// itself is still valid and unexpired.
+func TestHasFeature_DemotedAdminLosesBypassImmediately(t *testing.T) {
+	store, authStore := setupAccessStore(t)
+	ctx := context.Background()
+	userID := createTestUser(t, authStore, "access-admin", "admin")
+
+	if _, err := store.conn.ExecContext(ctx, `UPDATE users SET role = 'user' WHERE id = $1`, userID); err != nil {
+		t.Fatalf("demoting user: %v", err)
+	}
+
+	// Simulates a request carrying a JWT signed before the demotion —
+	// claims.Role is still "admin" even though the DB says otherwise.
+	has, err := HasFeature(ctx, store, userID, "admin", "notes")
+	if err != nil {
+		t.Fatalf("HasFeature: %v", err)
+	}
+	if has {
+		t.Fatal("expected demoted user's stale admin claim to not bypass gating")
+	}
+
+	if err := store.Grant(ctx, userID, "notes"); err != nil {
+		t.Fatalf("Grant: %v", err)
+	}
+	hasAfterGrant, err := HasFeature(ctx, store, userID, "admin", "notes")
+	if err != nil {
+		t.Fatalf("HasFeature (after grant): %v", err)
+	}
+	if !hasAfterGrant {
+		t.Fatal("expected demoted user to still see features granted directly")
+	}
+}

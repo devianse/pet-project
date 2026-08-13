@@ -11,17 +11,19 @@ import (
 )
 
 func TestRequireFeature_AdminBypassesWithoutGrant(t *testing.T) {
-	// &Store{} is safe here: admin's path in HasFeature returns before
-	// ever touching store.conn, so no real DB connection is needed for
-	// this pure-unit case.
-	store := &Store{}
+	// Needs a real Store now: HasFeature re-checks an "admin" claim
+	// against the users table before letting it bypass, so &Store{} (nil
+	// conn) would panic. See TestHasFeature_DemotedAdminLosesBypassImmediately
+	// in access_test.go for the case this re-check exists to close.
+	store, authStore := setupAccessStore(t)
+	adminID := createTestUser(t, authStore, "access-admin", "admin")
 	terminal := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 	handler := RequireFeature(store, "notes")(terminal)
 
 	secret := []byte("test-secret")
-	token, err := auth.SignToken(secret, 1, "access-admin", "admin")
+	token, err := auth.SignToken(secret, adminID, "access-admin", "admin")
 	if err != nil {
 		t.Fatalf("SignToken: %v", err)
 	}
