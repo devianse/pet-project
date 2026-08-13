@@ -227,7 +227,10 @@ Corrected framing from earlier in planning: OCR/photo parsing isn't a shopping-l
   `superpowers:brainstorming` properly before that gets written, per
   standing skill-usage rules.
 - **Admin web UI for managing grants** (deferred by the same design) —
-  CLI-only (`cmd/grantaccess`) for now.
+  CLI-only (`cmd/grantaccess`) for now. In progress as of 2026-08-14;
+  scoped to feature grants only — role promote/demote (see below) is a
+  separate, sequential follow-up task, not bundled into this one, though
+  it's expected to land on the same admin page once designed.
 - **Browser-level verification of the JWT auth frontend flow**
   (login/logout/redirect actually rendering and working, not just
   passing code review + a curl-proven backend) — not done as of the
@@ -244,7 +247,9 @@ Corrected framing from earlier in planning: OCR/photo parsing isn't a shopping-l
   Originally filed as "not urgent, `role` isn't enforced anywhere yet" —
   that's no longer true (`role` now gates the admin bypass in
   `internal/access`, see the resolved permissions item above), so this
-  is worth revisiting sooner than the original note implied.
+  is worth revisiting sooner than the original note implied. Sequenced
+  as a follow-up to the admin grants UI above (separate task/PR, not
+  bundled), expected to land on the same admin page once designed.
 
 ## Security TODO (deferred out of the pre-deployment hardening pass)
 
