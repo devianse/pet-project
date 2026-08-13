@@ -16,6 +16,19 @@ func mustCreateActivity(t *testing.T, store *Store) Activity {
 	return a
 }
 
+func mustCreateUser(t *testing.T, store *Store, username string) int64 {
+	t.Helper()
+	var id int64
+	err := store.conn.QueryRowContext(context.Background(),
+		`INSERT INTO users (username, password_hash, role) VALUES ($1, 'x', 'user') RETURNING id`,
+		username,
+	).Scan(&id)
+	if err != nil {
+		t.Fatalf("creating test user %q: %v", username, err)
+	}
+	return id
+}
+
 func TestStore_CreateProposalThenListProposals(t *testing.T) {
 	store := setupStore(t)
 	ctx := context.Background()
@@ -173,5 +186,55 @@ func TestStore_SetProposalStatus_RejectsAlreadyDecided(t *testing.T) {
 	_, err = store.SetProposalStatus(ctx, created.ID, StatusDeclined, 2)
 	if !errors.Is(err, ErrProposalNotActionable) {
 		t.Fatalf("expected ErrProposalNotActionable for an already-decided proposal, got %v", err)
+	}
+}
+
+func TestStore_ListProposals_IncludesProposedByUsername(t *testing.T) {
+	store := setupStore(t)
+	ctx := context.Background()
+	activity := mustCreateActivity(t, store)
+	date := time.Date(2026, 8, 20, 0, 0, 0, 0, time.UTC)
+
+	userID := mustCreateUser(t, store, "alice")
+
+	created, err := store.CreateProposal(ctx, activity.ID, date, TimeSlotEvening, EnergyCasual, []Mood{MoodChill}, userID)
+	if err != nil {
+		t.Fatalf("CreateProposal: %v", err)
+	}
+	if created.ProposedByUsername != "alice" {
+		t.Fatalf("expected CreateProposal to return proposed_by_username %q, got %q", "alice", created.ProposedByUsername)
+	}
+
+	listed, err := store.ListProposals(ctx)
+	if err != nil {
+		t.Fatalf("ListProposals: %v", err)
+	}
+	if len(listed) != 1 || listed[0].ProposedByUsername != "alice" {
+		t.Fatalf("expected ListProposals to return proposed_by_username %q, got %+v", "alice", listed)
+	}
+
+	updated, err := store.SetProposalStatus(ctx, created.ID, StatusAccepted, userID+1)
+	if err != nil {
+		t.Fatalf("SetProposalStatus: %v", err)
+	}
+	if updated.ProposedByUsername != "alice" {
+		t.Fatalf("expected SetProposalStatus to return proposed_by_username %q, got %q", "alice", updated.ProposedByUsername)
+	}
+}
+
+func TestStore_ListProposals_FallsBackWhenUserMissing(t *testing.T) {
+	store := setupStore(t)
+	ctx := context.Background()
+	activity := mustCreateActivity(t, store)
+	date := time.Date(2026, 8, 20, 0, 0, 0, 0, time.UTC)
+
+	// No row in `users` for id 999999 — the join must not drop the
+	// proposal, and must not error.
+	created, err := store.CreateProposal(ctx, activity.ID, date, TimeSlotEvening, EnergyCasual, []Mood{MoodChill}, 999999)
+	if err != nil {
+		t.Fatalf("CreateProposal: %v", err)
+	}
+	if created.ProposedByUsername != "someone" {
+		t.Fatalf("expected fallback username %q for a proposer with no users row, got %q", "someone", created.ProposedByUsername)
 	}
 }
