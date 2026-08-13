@@ -130,3 +130,23 @@ locally against `DATABASE_URL`), or against the deployed database via
 `docker compose exec backend createuser -username=<name>
 -role=admin|user` — the runtime image ships the `createuser` binary
 alongside `api`, no Go toolchain needed inside the container.
+
+New non-admin accounts start with **zero feature grants** — `admin`
+accounts bypass gating automatically, but a `user`-role account can't
+see Notes, Watchlist, or Date Night until granted. Grant per feature
+with `cmd/grantaccess` (same pattern as `createuser`, and shipped in
+the runtime image alongside it):
+
+```bash
+go run ./cmd/grantaccess -username=<name> -grant=<feature>   # or -revoke=<feature>
+go run ./cmd/grantaccess -username=<name> -list              # see current grants
+```
+
+against the deployed database: `docker compose exec backend
+grantaccess -username=<name> -grant=<feature>`. Valid `<feature>`
+values are `notes`, `watchlist`, `date-night`, `shopping-list`,
+`image-processing` (see `backend/internal/access/features.go`'s
+`KnownFeatures` for the source of truth). This is a required step
+right after seeding a non-admin account — see
+`docs/superpowers/specs/2026-08-13-feature-visibility-design.md` for
+the full design.
