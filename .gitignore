@@ -23,6 +23,7 @@
 
 # --- Claude Code ---
 /.claude/worktrees/
+/.claude/settings.local.json
 /.superpowers/
 
 # --- Local-only design docs (not shared to remote) ---

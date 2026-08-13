@@ -7,13 +7,16 @@ Check both before assuming a decision hasn't been made.
 
 ## Current phase
 
-Phase 1 (barebones scaffold) is done. Phase 2 (auth, WebSockets) has NOT
-started — don't assume either exists. Several small features (Notes,
-design system, pre-deployment security hardening, an upcoming Movie
-Sharing list) have landed ahead of phase 2/3 as deliberate detours before
-a first VPS deployment attempt — see `PLANNING.md`'s "Actual build order
-so far" section for the current sequence, not just the original
-phase breakdown further down that file.
+Phase 1 (barebones scaffold) is done. Phase 2's first half — real JWT
+auth (invite-only accounts, httpOnly session cookie, `admin`/`user`
+roles) — is done and merged to `main`. Phase 2's second half,
+WebSockets, has NOT started — don't assume it exists. Several small
+features (Notes, design system, pre-deployment security hardening,
+Movie/TV Sharing List, Date Night) have landed ahead of phase 2/3 as
+deliberate detours, alongside a first VPS deployment (live at
+`mikelab.dev`) — see `PLANNING.md`'s "Actual build order so far" section
+for the current sequence, not just the original phase breakdown further
+down that file.
 
 ## Layout
 
