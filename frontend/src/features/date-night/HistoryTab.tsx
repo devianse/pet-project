@@ -3,7 +3,8 @@ import { Card } from '@/components/pouf/surface'
 import { Stack, Row } from '@/components/pouf/layout'
 import { toneClass } from '@/components/pouf/tone'
 import { CATEGORY_TONE, CATEGORY_LABEL } from './categories'
-import { formatProposalDate, TIME_SLOT_LABEL, ENERGY_LABEL, MOOD_LABEL } from './format'
+import { formatProposalDate, TIME_SLOT_LABEL, ENERGY_LABEL } from './format'
+import { MoodChips } from './MoodChips'
 
 export function HistoryTab({
   history,
@@ -32,7 +33,7 @@ export function HistoryTab({
                   <span
                     className={[
                       toneClass(CATEGORY_TONE[activity.category]),
-                      'font-black uppercase text-[12px] bg-[var(--tone)]/10 text-[var(--tone)] rounded-full px-2 py-1',
+                      'font-black uppercase text-[12px] bg-[var(--tone)]/10 rounded-full px-2 py-1',
                     ].join(' ')}
                   >
                     {CATEGORY_LABEL[activity.category]}
@@ -52,16 +53,7 @@ export function HistoryTab({
 
               <span className="text-[13px]">{ENERGY_LABEL[proposal.energy_level]}</span>
 
-              <Row wrap gap={1}>
-                {proposal.moods.map((mood) => (
-                  <span
-                    key={mood}
-                    className="font-bold text-[12px] bg-pink/10 text-pink rounded-full px-2 py-1"
-                  >
-                    {MOOD_LABEL[mood]}
-                  </span>
-                ))}
-              </Row>
+              <MoodChips moods={proposal.moods} />
 
               <span className="text-[13px] text-muted">{proposal.proposed_by_username} proposed</span>
             </Stack>

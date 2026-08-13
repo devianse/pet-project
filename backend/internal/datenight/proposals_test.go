@@ -20,7 +20,9 @@ func mustCreateUser(t *testing.T, store *Store, username string) int64 {
 	t.Helper()
 	var id int64
 	err := store.conn.QueryRowContext(context.Background(),
-		`INSERT INTO users (username, password_hash, role) VALUES ($1, 'x', 'user') RETURNING id`,
+		`INSERT INTO users (username, password_hash, role) VALUES ($1, 'x', 'user')
+		 ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash
+		 RETURNING id`,
 		username,
 	).Scan(&id)
 	if err != nil {
