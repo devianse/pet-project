@@ -285,3 +285,40 @@ func TestHandler_DeclineProposal_Conflict(t *testing.T) {
 		t.Fatalf("expected 409, got %d", rec.Code)
 	}
 }
+
+func TestHandler_CreateProposal_IncludesProposedByUsername(t *testing.T) {
+	store := setupStore(t)
+	handler := NewHandler(store)
+	activity := mustCreateActivity(t, store)
+	mustCreateUser(t, store, "alice")
+	aliceID := int64(1) // placeholder, overwritten below
+	// requestAs signs a token for whatever (userID, username) is passed —
+	// it doesn't require a matching `users` row — but the join in Task 1
+	// reads the real `users` table, so the row must exist and its id must
+	// match what's signed into the token.
+	row := store.conn.QueryRowContext(context.Background(), `SELECT id FROM users WHERE username = 'alice'`)
+	if err := row.Scan(&aliceID); err != nil {
+		t.Fatalf("looking up alice's id: %v", err)
+	}
+
+	body, _ := json.Marshal(map[string]any{
+		"activity_id":  activity.ID,
+		"date":         "2026-08-20",
+		"time_slot":    "evening",
+		"energy_level": "casual",
+		"moods":        []string{"romantic", "playful"},
+	})
+	req := requestAs(t, aliceID, "alice", http.MethodPost, "/api/datenight/proposals", body)
+	rec := serveWithAuth(handler.CreateProposal, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var created Proposal
+	if err := json.Unmarshal(rec.Body.Bytes(), &created); err != nil {
+		t.Fatalf("decoding response: %v", err)
+	}
+	if created.ProposedByUsername != "alice" {
+		t.Fatalf("expected proposed_by_username %q in JSON response, got %q", "alice", created.ProposedByUsername)
+	}
+}
