@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/devianse/pet-project/backend/internal/platform"
 )
@@ -40,9 +42,28 @@ type meResponse struct {
 	ID          int64    `json:"id"`
 	Username    string   `json:"username"`
 	DisplayName *string  `json:"display_name"`
+	AvatarColor *string  `json:"avatar_color"`
 	Role        string   `json:"role"`
 	Features    []string `json:"features"`
+	CreatedAt   string   `json:"created_at"`
 }
+
+// allowedAvatarColors mirrors the frontend's pouf design system's six
+// "brand" tones (frontend/src/components/pouf/tone.ts) — the ones meant
+// for user-facing color choices, not the semantic up/down/warn/info/idle
+// tones reserved for status. Kept as the single point of truth for what
+// a client is allowed to set; the frontend's swatch picker is expected to
+// only ever offer this same set.
+var allowedAvatarColors = map[string]bool{
+	"pink":   true,
+	"purple": true,
+	"blue":   true,
+	"mint":   true,
+	"yellow": true,
+	"orange": true,
+}
+
+const maxDisplayNameLength = 60
 
 // dummyHash is a valid bcrypt hash of no real password. Used to make
 // Login pay the same bcrypt cost whether the username exists or not,
@@ -63,8 +84,10 @@ func (h *Handler) buildMeResponse(ctx context.Context, user *User) (meResponse, 
 		ID:          user.ID,
 		Username:    user.Username,
 		DisplayName: user.DisplayName,
+		AvatarColor: user.AvatarColor,
 		Role:        user.Role,
 		Features:    features,
+		CreatedAt:   user.CreatedAt.Format(time.RFC3339),
 	}, nil
 }
 
@@ -148,6 +171,72 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
+	resp, err := h.buildMeResponse(r.Context(), user)
+	if err != nil {
+		slog.Error("building me response", "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	platform.WriteJSON(w, http.StatusOK, resp)
+}
+
+type updateMeRequest struct {
+	DisplayName *string `json:"display_name"`
+	AvatarColor *string `json:"avatar_color"`
+}
+
+// UpdateMe is a full replace of the caller's own profile fields
+// (display_name, avatar_color) — not a partial patch. An omitted field
+// decodes to nil, which UpdateProfile treats as "clear this column", so
+// a client that only wants to change one field must still resend the
+// other's current value. Simple over general: this app has exactly one
+// caller (the frontend's user menu), which always holds both fields in
+// state already.
+func (h *Handler) UpdateMe(w http.ResponseWriter, r *http.Request) {
+	claims, err := claimsFromRequest(r, h.secret)
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	userID, err := claims.UserID()
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req updateMeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "malformed JSON body", http.StatusBadRequest)
+		return
+	}
+
+	if req.DisplayName != nil {
+		trimmed := strings.TrimSpace(*req.DisplayName)
+		if len(trimmed) > maxDisplayNameLength {
+			http.Error(w, "display_name too long", http.StatusBadRequest)
+			return
+		}
+		// A blank name isn't a meaningful override — clear it so the
+		// caller falls back to displaying the username, same as if it
+		// had never been set.
+		if trimmed == "" {
+			req.DisplayName = nil
+		} else {
+			req.DisplayName = &trimmed
+		}
+	}
+	if req.AvatarColor != nil && !allowedAvatarColors[*req.AvatarColor] {
+		http.Error(w, "unknown avatar_color", http.StatusBadRequest)
+		return
+	}
+
+	user, err := h.store.UpdateProfile(r.Context(), userID, req.DisplayName, req.AvatarColor)
+	if err != nil {
+		slog.Error("update profile", "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
 	resp, err := h.buildMeResponse(r.Context(), user)
 	if err != nil {
 		slog.Error("building me response", "error", err)

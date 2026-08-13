@@ -33,7 +33,7 @@ func setupStore(t *testing.T) *auth.Store {
 		t.Fatalf("ensuring schema: %v", err)
 	}
 	if _, err := conn.ExecContext(context.Background(),
-		"DELETE FROM users WHERE username IN ('cli-mike', 'cli-dupe')"); err != nil {
+		"DELETE FROM users WHERE username IN ('cli-mike', 'cli-dupe', 'cli-ada')"); err != nil {
 		t.Fatalf("clearing users table: %v", err)
 	}
 	return store
@@ -42,7 +42,7 @@ func setupStore(t *testing.T) *auth.Store {
 func TestCreateUser_Success(t *testing.T) {
 	store := setupStore(t)
 
-	if err := createUser(context.Background(), store, "cli-mike", "s3cret-pass", "admin"); err != nil {
+	if err := createUser(context.Background(), store, "cli-mike", "s3cret-pass", "admin", ""); err != nil {
 		t.Fatalf("createUser: %v", err)
 	}
 
@@ -56,15 +56,34 @@ func TestCreateUser_Success(t *testing.T) {
 	if !auth.VerifyPassword(found.PasswordHash, "s3cret-pass") {
 		t.Fatal("expected the stored hash to verify against the original password")
 	}
+	if found.DisplayName != nil {
+		t.Fatalf("expected no display_name when -display-name is omitted, got %v", *found.DisplayName)
+	}
+}
+
+func TestCreateUser_WithDisplayName(t *testing.T) {
+	store := setupStore(t)
+
+	if err := createUser(context.Background(), store, "cli-ada", "s3cret-pass", "user", "  Ada  "); err != nil {
+		t.Fatalf("createUser: %v", err)
+	}
+
+	found, err := store.FindByUsername(context.Background(), "cli-ada")
+	if err != nil {
+		t.Fatalf("FindByUsername: %v", err)
+	}
+	if found == nil || found.DisplayName == nil || *found.DisplayName != "Ada" {
+		t.Fatalf("expected display_name %q (trimmed), got %+v", "Ada", found)
+	}
 }
 
 func TestCreateUser_RejectsDuplicateUsername(t *testing.T) {
 	store := setupStore(t)
 
-	if err := createUser(context.Background(), store, "cli-dupe", "pass-one", "user"); err != nil {
+	if err := createUser(context.Background(), store, "cli-dupe", "pass-one", "user", ""); err != nil {
 		t.Fatalf("createUser (first): %v", err)
 	}
-	if err := createUser(context.Background(), store, "cli-dupe", "pass-two", "user"); err == nil {
+	if err := createUser(context.Background(), store, "cli-dupe", "pass-two", "user", ""); err == nil {
 		t.Fatal("expected an error creating a duplicate username")
 	}
 }

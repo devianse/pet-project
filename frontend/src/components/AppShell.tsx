@@ -2,8 +2,8 @@ import type { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { NavLink, type LinkComponent } from '@/components/pouf/NavLink'
 import type { IconName } from '@/components/pouf/Icon'
-import { Button } from '@/components/pouf/Button'
 import { ThemeToggle } from './ThemeToggle'
+import { UserMenu } from './UserMenu'
 import { useAuth } from '@/shared/auth'
 import type { FeatureKey } from '@/shared/api'
 
@@ -31,7 +31,7 @@ const NAV_ITEMS: { href: string; label: string; icon: IconName; feature?: Featur
 // so content doesn't stretch edge-to-edge on large monitors.
 export function AppShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
   const visibleNavItems = NAV_ITEMS.filter((item) => !item.feature || user?.features.includes(item.feature))
 
   return (
@@ -55,17 +55,15 @@ export function AppShell({ children }: { children: ReactNode }) {
           </NavLink>
         ))}
         <div className="hidden md:block flex-1" />
-        {user && (
-          <div className="flex flex-row items-center gap-2 md:flex-col md:items-stretch md:gap-2 px-2 md:pb-2">
+        <div className="flex flex-row items-center gap-2 md:justify-between md:gap-2 px-2 md:pb-2">
+          {user && <UserMenu />}
+          {user && (
             <span className="hidden md:block text-sm font-bold text-muted truncate">
               {user.display_name || user.username}
             </span>
-            <Button onClick={logout} variant="quiet" size="sm">
-              Log out
-            </Button>
-          </div>
-        )}
-        <ThemeToggle />
+          )}
+          <ThemeToggle />
+        </div>
       </nav>
       <main className="flex-1 min-w-0 p-4 md:p-8 2xl:mx-auto 2xl:w-full 2xl:max-w-350">
         {children}

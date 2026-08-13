@@ -1,1 +1,10 @@
 @import './components/pouf/pouf.css';
+
+/* UserMenu's popover reuses .pouf-menu's chrome, but that class's own
+ * padding-block is intentionally asymmetric (see pouf.css's "lip" comment)
+ * for click-row menus, not a top-heavy Avatar + text layout — this scoped
+ * class (two selectors = higher specificity than .pouf-menu alone) adds
+ * back the top breathing room without touching the vendored file. */
+.user-menu-popover {
+  padding-top: var(--s4);
+}
