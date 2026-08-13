@@ -103,6 +103,11 @@ func main() {
 		return access.RequireFeature(accessStore, key)
 	}
 
+	adminHandler := access.NewAdminHandler(accessStore, authStore)
+	requireAdmin := func(h http.Handler) http.Handler {
+		return requireAuth(access.RequireRole(accessStore, "admin")(h))
+	}
+
 	// loginLimiter caps login attempts per IP: bcrypt-costed and, since
 	// JWT auth replaced Caddy basic-auth, publicly reachable and
 	// unauthenticated — see PLANNING.md's Security TODO. 5 requests/min
@@ -132,6 +137,10 @@ func main() {
 	mux.Handle("POST /api/datenight/proposals", requireAuth(requireFeature("date-night")(http.HandlerFunc(datenightHandler.CreateProposal))))
 	mux.Handle("POST /api/datenight/proposals/{id}/accept", requireAuth(requireFeature("date-night")(http.HandlerFunc(datenightHandler.AcceptProposal))))
 	mux.Handle("POST /api/datenight/proposals/{id}/decline", requireAuth(requireFeature("date-night")(http.HandlerFunc(datenightHandler.DeclineProposal))))
+
+	mux.Handle("GET /api/admin/users", requireAdmin(http.HandlerFunc(adminHandler.ListUsers)))
+	mux.Handle("POST /api/admin/users/{id}/features/{key}", requireAdmin(http.HandlerFunc(adminHandler.GrantFeature)))
+	mux.Handle("DELETE /api/admin/users/{id}/features/{key}", requireAdmin(http.HandlerFunc(adminHandler.RevokeFeature)))
 
 	port := os.Getenv("PORT")
 	if port == "" {
