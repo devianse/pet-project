@@ -14,7 +14,7 @@ import { Segmented } from '@/components/pouf/Segmented'
 import { Stack, Row } from '@/components/pouf/layout'
 import { CalendarGrid } from './CalendarGrid'
 import { ActivityCard } from './ActivityCard'
-import { TIME_SLOT_LABEL } from './format'
+import { ENERGY_LABEL, MOOD_LABEL, TIME_SLOT_LABEL } from './format'
 
 // Built from the same map the proposal card reads, so a slot can never be
 // labelled one way in the picker and another way in the result.
@@ -22,23 +22,13 @@ const TIME_SLOT_OPTIONS: { value: DateNightTimeSlot; label: string }[] = (
   Object.keys(TIME_SLOT_LABEL) as DateNightTimeSlot[]
 ).map((value) => ({ value, label: TIME_SLOT_LABEL[value] }))
 
-const ENERGY_OPTIONS: { value: DateNightEnergyLevel; label: string }[] = [
-  { value: 'couch_potato', label: '🛋️ Couch Potato' },
-  { value: 'casual', label: '👕 Casual' },
-  { value: 'adventurous', label: '🦎 Adventurous' },
-  { value: 'unstoppable', label: '💥 Unstoppable' },
-]
+const ENERGY_OPTIONS: { value: DateNightEnergyLevel; label: string }[] = (
+  Object.keys(ENERGY_LABEL) as DateNightEnergyLevel[]
+).map((value) => ({ value, label: ENERGY_LABEL[value] }))
 
-const MOOD_OPTIONS: { value: DateNightMood; label: string }[] = [
-  { value: 'romantic', label: '💕 Romantic' },
-  { value: 'playful', label: '🦩 Playful' },
-  { value: 'nostalgic', label: '🎞️ Nostalgic' },
-  { value: 'cozy', label: '🏕️ Cozy' },
-  { value: 'excited', label: '🥳 Excited' },
-  { value: 'chill', label: '😌 Chill' },
-  { value: 'sentimental', label: '🥺 Sentimental' },
-  { value: 'silly', label: '🤪 Silly' },
-]
+const MOOD_OPTIONS: { value: DateNightMood; label: string }[] = (
+  Object.keys(MOOD_LABEL) as DateNightMood[]
+).map((value) => ({ value, label: MOOD_LABEL[value] }))
 
 export function ProposeForm({
   activities,
