@@ -38,3 +38,35 @@ func RequireFeature(store *Store, key string) func(http.Handler) http.Handler {
 		})
 	}
 }
+
+// RequireRole 403s a request whose caller's role — re-verified against
+// the DB, not just the JWT claim — isn't exactly role. Same
+// staleness-safe pattern as HasFeature's admin-bypass re-check: a
+// demoted admin loses access on their very next request, no re-login
+// required. Must run inside auth.Require, same as RequireFeature.
+func RequireRole(store *Store, role string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			claims, ok := auth.ClaimsFromContext(r.Context())
+			if !ok {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+			userID, err := claims.UserID()
+			if err != nil {
+				http.Error(w, "internal error", http.StatusInternalServerError)
+				return
+			}
+			current, err := store.currentRole(r.Context(), userID)
+			if err != nil {
+				http.Error(w, "internal error", http.StatusInternalServerError)
+				return
+			}
+			if current != role {
+				http.Error(w, "forbidden", http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}

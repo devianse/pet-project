@@ -95,3 +95,104 @@ func TestRequireFeature_NonAdminNeedsGrant(t *testing.T) {
 		t.Fatalf("expected 200 after grant, got %d", rec.Code)
 	}
 }
+
+func TestRequireRole_RejectsMissingClaims(t *testing.T) {
+	store := &Store{}
+	terminal := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	handler := RequireRole(store, "admin")(terminal)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/users", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 with no claims in context, got %d", rec.Code)
+	}
+}
+
+func TestRequireRole_AdminPasses(t *testing.T) {
+	store, authStore := setupAccessStore(t)
+	adminID := createTestUser(t, authStore, "access-admin", "admin")
+	terminal := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	handler := RequireRole(store, "admin")(terminal)
+
+	secret := []byte("test-secret")
+	token, err := auth.SignToken(secret, adminID, "access-admin", "admin")
+	if err != nil {
+		t.Fatalf("SignToken: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/users", nil)
+	req.AddCookie(&http.Cookie{Name: "auth_token", Value: token})
+	rec := httptest.NewRecorder()
+
+	chained := auth.Require(secret)(handler)
+	chained.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for a real admin, got %d", rec.Code)
+	}
+}
+
+func TestRequireRole_NonAdminForbidden(t *testing.T) {
+	store, authStore := setupAccessStore(t)
+	userID := createTestUser(t, authStore, "access-mw", "user")
+	terminal := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	handler := RequireRole(store, "admin")(terminal)
+
+	secret := []byte("test-secret")
+	token, err := auth.SignToken(secret, userID, "access-mw", "user")
+	if err != nil {
+		t.Fatalf("SignToken: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/users", nil)
+	req.AddCookie(&http.Cookie{Name: "auth_token", Value: token})
+	rec := httptest.NewRecorder()
+
+	chained := auth.Require(secret)(handler)
+	chained.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for a non-admin, got %d", rec.Code)
+	}
+}
+
+// TestRequireRole_StaleAdminClaimForbidden guards the same gap
+// HasFeature's demoted-admin test closes: a JWT signed while the caller
+// was admin must not keep bypassing RequireRole after they're demoted in
+// the DB, even though the token itself is still valid and unexpired.
+func TestRequireRole_StaleAdminClaimForbidden(t *testing.T) {
+	store, authStore := setupAccessStore(t)
+	ctx := context.Background()
+	adminID := createTestUser(t, authStore, "access-admin", "admin")
+
+	secret := []byte("test-secret")
+	token, err := auth.SignToken(secret, adminID, "access-admin", "admin")
+	if err != nil {
+		t.Fatalf("SignToken: %v", err)
+	}
+
+	if _, err := store.conn.ExecContext(ctx, `UPDATE users SET role = 'user' WHERE id = $1`, adminID); err != nil {
+		t.Fatalf("demoting user: %v", err)
+	}
+
+	terminal := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	handler := RequireRole(store, "admin")(terminal)
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/users", nil)
+	req.AddCookie(&http.Cookie{Name: "auth_token", Value: token})
+	rec := httptest.NewRecorder()
+
+	chained := auth.Require(secret)(handler)
+	chained.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for a stale admin claim after demotion, got %d", rec.Code)
+	}
+}
