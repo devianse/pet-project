@@ -58,14 +58,15 @@ matches the shell-first order above one-for-one:
    during this pass: `infra/docker-compose.yml` wasn't passing
    `TMDB_READ_ACCESS_TOKEN` into the backend container at all (backend
    exits on startup without it) — added alongside this deployment.
-7. **Real JWT auth** (phase 2, first half — done, on the `jwt` branch,
-   not yet merged to `main` as of this writing). Replaces the Caddy
-   basic-auth stopgap from step 4: a `users` table (invite-only, no
-   public registration — accounts are seeded via a new `cmd/createuser`
-   CLI), bcrypt password hashes, a signed JWT held in an httpOnly
-   `SameSite=Strict` session cookie, `admin`/`user` roles (fine-grained
-   per-user permissions deliberately deferred — see "Open questions"
-   below), and the whole SPA gated behind login. Full design/build
+7. **Real JWT auth** (phase 2, first half — done, merged to `main` via
+   the `jwt` branch, PR #4). Replaces the Caddy basic-auth stopgap from
+   step 4: a `users` table (invite-only, no public registration —
+   accounts are seeded via a new `cmd/createuser` CLI), bcrypt password
+   hashes, a signed JWT held in an httpOnly `SameSite=Strict` session
+   cookie, `admin`/`user` roles (fine-grained per-user permissions
+   deliberately deferred at the time — since resolved, see "Open
+   questions" below), and the whole SPA gated behind login. Full
+   design/build
    record: `docs/superpowers/specs/2026-08-10-jwt-auth-design.md` and
    `docs/superpowers/plans/2026-08-10-jwt-auth.md`. Built via
    `superpowers:subagent-driven-development` — 14 tasks, a final
@@ -163,6 +164,8 @@ Corrected framing from earlier in planning: OCR/photo parsing isn't a shopping-l
 
 ## Open questions / not yet decided
 
+### Resolved
+
 - ~~Exact repo/folder structure inside `pet-projects/`~~ — resolved by
   what actually exists: `backend/`, `frontend/`, `docs/`, `infra/`
   (added in step 4 above) at the root, each app managing its own deps.
@@ -175,45 +178,57 @@ Corrected framing from earlier in planning: OCR/photo parsing isn't a shopping-l
   Link parsing is IMDb-URL-only; TMDb's `/find` resolves the id. TMDb's
   Russia/Belarus IP block doesn't reach a Cloudzy-hosted backend, since
   the block is IP-based and Cloudzy has no Russia region.
-- Which of Shopping List / Image Processing gets built first once phase
-  3 resumes, or whether they're built in parallel
-- OCR approach (local Tesseract vs cloud API), if/when Image Processing gets built — not needed until that project is actually underway
-- Full phased implementation plan (SPEC-style, layer by layer like URL Shortener) for the shell first, then the shopping-list project — not written yet; next step should go through `superpowers:brainstorming` properly before that gets written, per standing skill-usage rules
-- ~~Fine-grained per-user permissions~~ — designed, not yet implemented:
-  see `docs/superpowers/specs/2026-08-13-feature-visibility-design.md`.
-  A `features`/`feature_access` table pair plus a `RequireFeature`
-  backend middleware and frontend route guard, granted per user via a
-  new `cmd/grantaccess` CLI (same pattern as `cmd/createuser`); `admin`
-  bypasses automatically. Also retires Date Night's bespoke
-  `DATE_NIGHT_USERNAMES` env var onto the same mechanism. That design
-  explicitly deferred three follow-ups, not designed yet:
-  - **Expanding `/api/me`** beyond adding a `features` field —
-    `created_at`/`last_login_at`/other profile info later, once
-    something actually needs it.
-  - **`display_name` write path** — the column exists and is
-    read/returned everywhere already, but nothing ever writes it
-    (`cmd/createuser` doesn't take one, no update endpoint exists), so
-    it's always `NULL` in practice today.
-  - **Admin web UI for managing grants** — CLI-only for now.
+- ~~`jwt` branch merge~~ — merged to `main` via PR #4. (This bullet
+  previously said "not merged yet, by deliberate choice" — stale; the
+  merge happened shortly after that note was written.)
+- ~~Fine-grained per-user permissions~~ — designed **and implemented**:
+  see `docs/superpowers/specs/2026-08-13-feature-visibility-design.md`,
+  landed via the `visibility` branch (PR #9). A `features`/
+  `feature_access` table pair plus a `RequireFeature` backend middleware
+  and frontend route guard, granted per user via a new `cmd/grantaccess`
+  CLI (same pattern as `cmd/createuser`); `admin` bypasses automatically
+  (and, as of 2026-08-13, that bypass re-checks the DB rather than
+  trusting a possibly-stale JWT claim — closes the window where a
+  demoted admin kept bypass access until their token expired). Also
+  retired Date Night's bespoke `DATE_NIGHT_USERNAMES` env var onto the
+  same mechanism. That design explicitly deferred two follow-ups, still
+  genuinely open — see "Still open" below.
+
+### Still open
+
+- **Which of Shopping List / Image Processing** gets built first once
+  phase 3 resumes, or whether they're built in parallel.
+- **OCR approach** (local Tesseract vs cloud API), if/when Image
+  Processing gets built — not needed until that project is actually
+  underway.
+- **Full phased implementation plan** (SPEC-style, layer by layer like
+  URL Shortener) for the shell first, then the shopping-list project —
+  not written yet; next step should go through
+  `superpowers:brainstorming` properly before that gets written, per
+  standing skill-usage rules.
+- **`display_name` write path** (deferred by the feature-visibility
+  design) — the column exists and is read/returned everywhere already,
+  but nothing ever writes it (`cmd/createuser` doesn't take one, no
+  update endpoint exists), so it's always `NULL` in practice today.
+- **Admin web UI for managing grants** (deferred by the same design) —
+  CLI-only (`cmd/grantaccess`) for now.
 - **Browser-level verification of the JWT auth frontend flow**
   (login/logout/redirect actually rendering and working, not just
   passing code review + a curl-proven backend) — not done as of the
   `jwt` branch landing; no browser automation tool was available in that
   session and it was explicitly accepted as an open gap rather than
-  chased down. Worth a manual `make dev-backend` + `make dev-frontend`
-  click-through, or picking this up once `/chrome` is connected in a
-  future session, before or shortly after this branch merges.
-- **`jwt` branch merge** — implementation, task-level review, and a
-  final whole-branch review (with one fix wave) are all done and clean;
-  the branch itself hasn't been merged to `main` or opened as a PR yet,
-  by deliberate choice ("keep as-is" for now).
+  chased down. The `claude-in-chrome` skill is available now, so this is
+  no longer blocked on tooling — worth a manual `make dev-backend` +
+  `make dev-frontend` click-through, or driving it through that skill,
+  next time frontend auth work is touched.
 - **Changing an existing user's role** — `cmd/createuser` only creates
   new accounts; there's no way yet to promote/demote an existing one
   (e.g. `user` → `admin`) short of editing the DB by hand. Noted while
-  seeding the first production admin account (2026-08-10 redeploy) as a
-  later addition, not urgent since `role` isn't enforced anywhere yet
-  (see the fine-grained-permissions item above) — revisit once role
-  actually gates something.
+  seeding the first production admin account (2026-08-10 redeploy).
+  Originally filed as "not urgent, `role` isn't enforced anywhere yet" —
+  that's no longer true (`role` now gates the admin bypass in
+  `internal/access`, see the resolved permissions item above), so this
+  is worth revisiting sooner than the original note implied.
 
 ## Security TODO (deferred out of the pre-deployment hardening pass)
 
