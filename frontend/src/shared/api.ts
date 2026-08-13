@@ -188,6 +188,7 @@ export type DateNightProposal = {
   moods: DateNightMood[]
   status: DateNightStatus
   proposed_by_user_id: number
+  proposed_by_username: string
   created_at: string
 }
 

@@ -1,7 +1,10 @@
 import type { DateNightActivity, DateNightProposal } from '@/shared/api'
-import { RowCard } from '@/components/pouf/surface'
+import { Card } from '@/components/pouf/surface'
 import { Stack, Row } from '@/components/pouf/layout'
-import { formatProposalDate, TIME_SLOT_LABEL } from './format'
+import { toneClass } from '@/components/pouf/tone'
+import { CATEGORY_TONE, CATEGORY_LABEL } from './categories'
+import { formatProposalDate, TIME_SLOT_LABEL, ENERGY_LABEL } from './format'
+import { MoodChips } from './MoodChips'
 
 export function HistoryTab({
   history,
@@ -20,17 +23,43 @@ export function HistoryTab({
 
   return (
     <Stack gap={2}>
-      {history.map((proposal) => (
-        <RowCard key={proposal.id}>
-          <Row justify="between">
-            <span>
-              {activityFor(proposal.activity_id)?.name ?? 'Unknown activity'} —{' '}
-              {formatProposalDate(proposal.date)} · {TIME_SLOT_LABEL[proposal.time_slot]}
-            </span>
-            <span className="font-black uppercase text-[12px]">{proposal.status}</span>
-          </Row>
-        </RowCard>
-      ))}
+      {history.map((proposal) => {
+        const activity = activityFor(proposal.activity_id)
+        return (
+          <Card key={proposal.id} variant="tight">
+            <Stack gap={2}>
+              <Row justify="between" wrap>
+                {activity ? (
+                  <span
+                    className={[
+                      toneClass(CATEGORY_TONE[activity.category]),
+                      'font-black uppercase text-[12px] bg-[var(--tone)]/10 rounded-full px-2 py-1',
+                    ].join(' ')}
+                  >
+                    {CATEGORY_LABEL[activity.category]}
+                  </span>
+                ) : (
+                  <span />
+                )}
+                <span className="font-black uppercase text-[12px]">{proposal.status}</span>
+              </Row>
+
+              <span className="font-black text-ink">{activity?.name ?? 'Unknown activity'}</span>
+              {activity?.description && <span className="text-[13px]">{activity.description}</span>}
+
+              <span className="font-bold text-[13px]">
+                {formatProposalDate(proposal.date)} · {TIME_SLOT_LABEL[proposal.time_slot]}
+              </span>
+
+              <span className="text-[13px]">{ENERGY_LABEL[proposal.energy_level]}</span>
+
+              <MoodChips moods={proposal.moods} />
+
+              <span className="text-[13px] text-muted">{proposal.proposed_by_username} proposed</span>
+            </Stack>
+          </Card>
+        )
+      })}
     </Stack>
   )
 }

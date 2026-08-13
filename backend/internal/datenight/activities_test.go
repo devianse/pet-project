@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/devianse/pet-project/backend/internal/auth"
 	"github.com/devianse/pet-project/backend/internal/db"
 )
 
@@ -28,6 +29,9 @@ func setupStore(t *testing.T) *Store {
 	store := NewStore(conn)
 	if err := store.EnsureSchema(context.Background()); err != nil {
 		t.Fatalf("ensuring schema: %v", err)
+	}
+	if err := auth.NewStore(conn).EnsureSchema(context.Background()); err != nil {
+		t.Fatalf("ensure auth schema: %v", err)
 	}
 	// date_night_proposals FKs to date_night_activities, so clear it
 	// first regardless of which test needs which table.

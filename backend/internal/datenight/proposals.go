@@ -109,15 +109,16 @@ func (d *DateOnly) UnmarshalJSON(data []byte) error {
 }
 
 type Proposal struct {
-	ID               int64          `json:"id"`
-	ActivityID       int64          `json:"activity_id"`
-	Date             DateOnly       `json:"date"`
-	TimeSlot         TimeSlot       `json:"time_slot"`
-	EnergyLevel      EnergyLevel    `json:"energy_level"`
-	Moods            []Mood         `json:"moods"`
-	Status           ProposalStatus `json:"status"`
-	ProposedByUserID int64          `json:"proposed_by_user_id"`
-	CreatedAt        time.Time      `json:"created_at"`
+	ID                 int64          `json:"id"`
+	ActivityID         int64          `json:"activity_id"`
+	Date               DateOnly       `json:"date"`
+	TimeSlot           TimeSlot       `json:"time_slot"`
+	EnergyLevel        EnergyLevel    `json:"energy_level"`
+	Moods              []Mood         `json:"moods"`
+	Status             ProposalStatus `json:"status"`
+	ProposedByUserID   int64          `json:"proposed_by_user_id"`
+	ProposedByUsername string         `json:"proposed_by_username"`
+	CreatedAt          time.Time      `json:"created_at"`
 }
 
 // ErrProposalNotActionable means the caller can't act on the target
@@ -155,9 +156,11 @@ func parseMoods(raw string) []Mood {
 
 func (s *Store) ListProposals(ctx context.Context) ([]Proposal, error) {
 	rows, err := s.conn.QueryContext(ctx, `
-		SELECT id, activity_id, date, time_slot, energy_level, moods, status, proposed_by_user_id, created_at
-		FROM date_night_proposals
-		ORDER BY created_at DESC, id DESC
+		SELECT p.id, p.activity_id, p.date, p.time_slot, p.energy_level, p.moods, p.status,
+		       p.proposed_by_user_id, COALESCE(u.username, 'someone'), p.created_at
+		FROM date_night_proposals p
+		LEFT JOIN users u ON u.id = p.proposed_by_user_id
+		ORDER BY p.created_at DESC, p.id DESC
 	`)
 	if err != nil {
 		return nil, err
@@ -168,7 +171,7 @@ func (s *Store) ListProposals(ctx context.Context) ([]Proposal, error) {
 	for rows.Next() {
 		var p Proposal
 		var moodsRaw string
-		if err := rows.Scan(&p.ID, &p.ActivityID, &p.Date, &p.TimeSlot, &p.EnergyLevel, &moodsRaw, &p.Status, &p.ProposedByUserID, &p.CreatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.ActivityID, &p.Date, &p.TimeSlot, &p.EnergyLevel, &moodsRaw, &p.Status, &p.ProposedByUserID, &p.ProposedByUsername, &p.CreatedAt); err != nil {
 			return nil, err
 		}
 		p.Moods = parseMoods(moodsRaw)
@@ -181,11 +184,17 @@ func (s *Store) CreateProposal(ctx context.Context, activityID int64, date time.
 	var p Proposal
 	var moodsRaw string
 	err := s.conn.QueryRowContext(ctx, `
-		INSERT INTO date_night_proposals (activity_id, date, time_slot, energy_level, moods, status, proposed_by_user_id)
-		VALUES ($1, $2, $3, $4, $5, 'pending', $6)
-		RETURNING id, activity_id, date, time_slot, energy_level, moods, status, proposed_by_user_id, created_at
+		WITH inserted AS (
+			INSERT INTO date_night_proposals (activity_id, date, time_slot, energy_level, moods, status, proposed_by_user_id)
+			VALUES ($1, $2, $3, $4, $5, 'pending', $6)
+			RETURNING id, activity_id, date, time_slot, energy_level, moods, status, proposed_by_user_id, created_at
+		)
+		SELECT i.id, i.activity_id, i.date, i.time_slot, i.energy_level, i.moods, i.status,
+		       i.proposed_by_user_id, COALESCE(u.username, 'someone'), i.created_at
+		FROM inserted i
+		LEFT JOIN users u ON u.id = i.proposed_by_user_id
 	`, activityID, date, slot, energy, joinMoods(moods), proposedByUserID).
-		Scan(&p.ID, &p.ActivityID, &p.Date, &p.TimeSlot, &p.EnergyLevel, &moodsRaw, &p.Status, &p.ProposedByUserID, &p.CreatedAt)
+		Scan(&p.ID, &p.ActivityID, &p.Date, &p.TimeSlot, &p.EnergyLevel, &moodsRaw, &p.Status, &p.ProposedByUserID, &p.ProposedByUsername, &p.CreatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
@@ -205,15 +214,21 @@ func (s *Store) SetProposalStatus(ctx context.Context, id int64, status Proposal
 	var p Proposal
 	var moodsRaw string
 	err := s.conn.QueryRowContext(ctx, `
-		UPDATE date_night_proposals
-		SET status = $2
-		WHERE id = $1
-		  AND status = 'pending'
-		  AND proposed_by_user_id <> $3
-		  AND id = (SELECT id FROM date_night_proposals ORDER BY created_at DESC, id DESC LIMIT 1)
-		RETURNING id, activity_id, date, time_slot, energy_level, moods, status, proposed_by_user_id, created_at
+		WITH updated AS (
+			UPDATE date_night_proposals
+			SET status = $2
+			WHERE id = $1
+			  AND status = 'pending'
+			  AND proposed_by_user_id <> $3
+			  AND id = (SELECT id FROM date_night_proposals ORDER BY created_at DESC, id DESC LIMIT 1)
+			RETURNING id, activity_id, date, time_slot, energy_level, moods, status, proposed_by_user_id, created_at
+		)
+		SELECT up.id, up.activity_id, up.date, up.time_slot, up.energy_level, up.moods, up.status,
+		       up.proposed_by_user_id, COALESCE(u.username, 'someone'), up.created_at
+		FROM updated up
+		LEFT JOIN users u ON u.id = up.proposed_by_user_id
 	`, id, status, respondingUserID).
-		Scan(&p.ID, &p.ActivityID, &p.Date, &p.TimeSlot, &p.EnergyLevel, &moodsRaw, &p.Status, &p.ProposedByUserID, &p.CreatedAt)
+		Scan(&p.ID, &p.ActivityID, &p.Date, &p.TimeSlot, &p.EnergyLevel, &moodsRaw, &p.Status, &p.ProposedByUserID, &p.ProposedByUsername, &p.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Proposal{}, ErrProposalNotActionable
 	}

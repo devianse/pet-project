@@ -1,11 +1,29 @@
 // frontend/src/features/date-night/format.ts
-import type { DateNightTimeSlot } from '@/shared/api'
+import type { DateNightEnergyLevel, DateNightMood, DateNightTimeSlot } from '@/shared/api'
 
 export const TIME_SLOT_LABEL: Record<DateNightTimeSlot, string> = {
   morning: 'Morning',
   afternoon: 'Afternoon',
   evening: 'Evening',
   night: 'Night',
+}
+
+export const ENERGY_LABEL: Record<DateNightEnergyLevel, string> = {
+  couch_potato: '🛋️ Couch Potato',
+  casual: '👕 Casual',
+  adventurous: '🦎 Adventurous',
+  unstoppable: '💥 Unstoppable',
+}
+
+export const MOOD_LABEL: Record<DateNightMood, string> = {
+  romantic: '💕 Romantic',
+  playful: '🦩 Playful',
+  nostalgic: '🎞️ Nostalgic',
+  cozy: '🏕️ Cozy',
+  excited: '🥳 Excited',
+  chill: '😌 Chill',
+  sentimental: '🥺 Sentimental',
+  silly: '🤪 Silly',
 }
 
 /** Renders a `YYYY-MM-DD` proposal date as e.g. "Thu, Aug 20".

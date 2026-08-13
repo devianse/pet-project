@@ -78,10 +78,12 @@ func (s *Store) EnsureSchema(ctx context.Context) error {
 	// This deviates from the design spec's `text[]`; see Self-review notes.
 	//
 	// proposed_by_user_id carries no FK to users(id) even though the spec
-	// lists one: the store tests insert synthetic ids (1, 2) against a
-	// database whose users table belongs to another package's schema, and
-	// a real FK would couple this package's tests to auth's fixtures for
-	// no safety this feature actually needs.
+	// lists one: it's read via a LEFT JOIN (see ListProposals) that
+	// already tolerates a missing users row, and the store tests insert
+	// synthetic ids (1, 2) that don't always correspond to a real user.
+	// A FK would force every test to create a users row first for no
+	// safety this feature actually needs — the LEFT JOIN's fallback
+	// already handles a dangling id gracefully.
 	_, err := s.conn.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS date_night_proposals (
 			id                   SERIAL PRIMARY KEY,
