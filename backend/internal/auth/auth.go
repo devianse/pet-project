@@ -76,6 +76,27 @@ func (s *Store) FindByID(ctx context.Context, id int64) (*User, error) {
 	return scanUser(row)
 }
 
+// ListUsers returns every user, ordered by username, for the admin
+// grants UI (access.AdminHandler). No pagination — the user base is
+// small and invite-only.
+func (s *Store) ListUsers(ctx context.Context) ([]*User, error) {
+	rows, err := s.conn.QueryContext(ctx, `SELECT `+selectUserColumns+` FROM users ORDER BY username`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []*User
+	for rows.Next() {
+		var u User
+		if err := rows.Scan(&u.ID, &u.Username, &u.DisplayName, &u.AvatarColor, &u.PasswordHash, &u.Role, &u.CreatedAt, &u.LastLoginAt); err != nil {
+			return nil, err
+		}
+		users = append(users, &u)
+	}
+	return users, rows.Err()
+}
+
 func (s *Store) CreateUser(ctx context.Context, username, passwordHash, role string) (*User, error) {
 	return s.CreateUserWithDisplayName(ctx, username, passwordHash, role, nil)
 }
