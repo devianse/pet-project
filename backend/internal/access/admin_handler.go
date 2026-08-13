@@ -86,3 +86,71 @@ func knownFeatureKeysCSV() string {
 	}
 	return strings.Join(keys, ", ")
 }
+
+// requireExistingUser 404s if id doesn't match a real user, so a typo'd
+// or stale id in the admin UI gets a clean not-found instead of falling
+// through to Grant's feature_access foreign-key violation (a generic
+// 500). Shared by GrantFeature and RevokeFeature.
+func (h *AdminHandler) requireExistingUser(w http.ResponseWriter, r *http.Request, userID int64) bool {
+	user, err := h.users.FindByID(r.Context(), userID)
+	if err != nil {
+		slog.Error("find user", "user_id", userID, "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return false
+	}
+	if user == nil {
+		http.Error(w, "no such user", http.StatusNotFound)
+		return false
+	}
+	return true
+}
+
+// GrantFeature grants the {key} feature to user {id}. Idempotent, like
+// accessStore.Grant and cmd/grantaccess's -grant flag.
+func (h *AdminHandler) GrantFeature(w http.ResponseWriter, r *http.Request) {
+	userID, ok := platform.IDParam(r)
+	if !ok {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	key := r.PathValue("key")
+	if !IsKnownFeature(key) {
+		http.Error(w, "unknown feature key (known: "+knownFeatureKeysCSV()+")", http.StatusBadRequest)
+		return
+	}
+	if !h.requireExistingUser(w, r, userID) {
+		return
+	}
+	if err := h.accessStore.Grant(r.Context(), userID, key); err != nil {
+		slog.Error("grant feature", "user_id", userID, "key", key, "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// RevokeFeature revokes the {key} feature from user {id}. Also
+// idempotent — revoking a feature the user never had is still a 204,
+// matching accessStore.Revoke's bool-not-error signature for "nothing to
+// revoke".
+func (h *AdminHandler) RevokeFeature(w http.ResponseWriter, r *http.Request) {
+	userID, ok := platform.IDParam(r)
+	if !ok {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	key := r.PathValue("key")
+	if !IsKnownFeature(key) {
+		http.Error(w, "unknown feature key (known: "+knownFeatureKeysCSV()+")", http.StatusBadRequest)
+		return
+	}
+	if !h.requireExistingUser(w, r, userID) {
+		return
+	}
+	if _, err := h.accessStore.Revoke(r.Context(), userID, key); err != nil {
+		slog.Error("revoke feature", "user_id", userID, "key", key, "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
