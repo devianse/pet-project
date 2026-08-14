@@ -3,6 +3,7 @@ package access
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -19,6 +20,7 @@ import (
 type userLister interface {
 	ListUsers(ctx context.Context) ([]*auth.User, error)
 	FindByID(ctx context.Context, id int64) (*auth.User, error)
+	UpdateRole(ctx context.Context, id int64, role string) (*auth.User, error)
 }
 
 // AdminHandler serves the admin-only user/feature-grant management API
@@ -149,6 +151,60 @@ func (h *AdminHandler) RevokeFeature(w http.ResponseWriter, r *http.Request) {
 	}
 	if _, err := h.accessStore.Revoke(r.Context(), userID, key); err != nil {
 		slog.Error("revoke feature", "user_id", userID, "key", key, "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+type updateRoleRequest struct {
+	Role string `json:"role"`
+}
+
+// UpdateRole promotes/demotes user {id} to the given role. Mirrors
+// GrantFeature/RevokeFeature's shape (validate input, 404 via
+// requireExistingUser, write, 204) with one addition: an admin can't
+// change their own role through this endpoint — a UI-only guard would
+// be trivially bypassed with curl, and RequireRole already re-verifies
+// role server-side for the same "don't trust a stale/spoofed claim"
+// reason, so the self-check belongs here too, not just in the frontend.
+func (h *AdminHandler) UpdateRole(w http.ResponseWriter, r *http.Request) {
+	userID, ok := platform.IDParam(r)
+	if !ok {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	var req updateRoleRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "malformed JSON body", http.StatusBadRequest)
+		return
+	}
+	if req.Role != "admin" && req.Role != "user" {
+		http.Error(w, `role must be "admin" or "user"`, http.StatusBadRequest)
+		return
+	}
+
+	claims, ok := auth.ClaimsFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	callerID, err := claims.UserID()
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if callerID == userID {
+		http.Error(w, "can't change your own role", http.StatusForbidden)
+		return
+	}
+
+	if !h.requireExistingUser(w, r, userID) {
+		return
+	}
+	if _, err := h.users.UpdateRole(r.Context(), userID, req.Role); err != nil {
+		slog.Error("update role", "user_id", userID, "role", req.Role, "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}

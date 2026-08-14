@@ -123,6 +123,25 @@ func (s *Store) CreateUserWithDisplayName(ctx context.Context, username, passwor
 	return user, nil
 }
 
+// UpdateRole sets a user's role. Callers (access.AdminHandler) are
+// responsible for validating role is a known value ("admin"/"user")
+// before calling — this is a plain write, same division of labor as
+// UpdateProfile's caller filling in "unchanged" fields.
+func (s *Store) UpdateRole(ctx context.Context, id int64, role string) (*User, error) {
+	row := s.conn.QueryRowContext(ctx, `
+		UPDATE users SET role = $1
+		WHERE id = $2
+		RETURNING `+selectUserColumns, role, id)
+	user, err := scanUser(row)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, errors.New("update returned no row")
+	}
+	return user, nil
+}
+
 func (s *Store) UpdateLastLogin(ctx context.Context, id int64) error {
 	_, err := s.conn.ExecContext(ctx, `UPDATE users SET last_login_at = now() WHERE id = $1`, id)
 	return err
