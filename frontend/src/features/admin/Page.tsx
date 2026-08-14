@@ -24,18 +24,23 @@ export default function AdminPage() {
   const [pending, setPending] = useState<Set<string>>(new Set())
 
   function load() {
-    getAdminUsers()
+    return getAdminUsers()
       .then(setUsers)
       .catch(() => setError('failed to load users'))
   }
 
-  useEffect(load, [])
+  useEffect(() => {
+    load()
+  }, [])
 
   // Re-fetches after every toggle rather than patching local state: the
   // matrix is small (invite-only user base, five known features) and a
   // refetch guarantees the UI always reflects the DB's real grant rows,
   // the same "actual grants, not assumed" principle ListUsers's endpoint
-  // already applies server-side.
+  // already applies server-side. Refetching on both the success and
+  // failure paths (via `finally`) matters especially on failure: a 403
+  // can mean the caller's own admin role was demoted mid-session, and
+  // the refetch is what surfaces that instead of leaving a stale table.
   async function toggle(user: AdminUser, key: FeatureKey, granted: boolean) {
     const cell = cellKey(user.id, key)
     setError(null)
@@ -46,10 +51,10 @@ export default function AdminPage() {
       } else {
         await grantFeature(user.id, key)
       }
-      load()
     } catch {
       setError(`failed to ${granted ? 'revoke' : 'grant'} ${key} for ${user.username}`)
     } finally {
+      await load()
       setPending((prev) => {
         const next = new Set(prev)
         next.delete(cell)

@@ -38,17 +38,25 @@ export async function getHealth(): Promise<{ status: string }> {
 // language boundary.
 export type FeatureKey = 'notes' | 'watchlist' | 'date-night' | 'shopping-list' | 'image-processing'
 
-// Feature key + human label pairs, hand-kept in sync with
+// Feature key -> human label, hand-kept in sync with
 // backend/internal/access/features.go's KnownFeatures — same duplication
-// FeatureKey itself already has across the language boundary. Used by
+// FeatureKey itself already has across the language boundary. Declared as
+// a Record so TypeScript enforces every FeatureKey has a label — adding a
+// key to the union without adding it here is now a compile error, rather
+// than the admin matrix silently rendering one column short.
+const FEATURE_LABELS: Record<FeatureKey, string> = {
+  notes: 'Notes',
+  watchlist: 'Watchlist',
+  'date-night': 'Date Night',
+  'shopping-list': 'Shopping List',
+  'image-processing': 'Image Processing',
+}
+
+// Feature key + human label pairs, derived from FEATURE_LABELS. Used by
 // the admin grants matrix to render one labeled column per feature.
-export const KNOWN_FEATURES: { key: FeatureKey; label: string }[] = [
-  { key: 'notes', label: 'Notes' },
-  { key: 'watchlist', label: 'Watchlist' },
-  { key: 'date-night', label: 'Date Night' },
-  { key: 'shopping-list', label: 'Shopping List' },
-  { key: 'image-processing', label: 'Image Processing' },
-]
+export const KNOWN_FEATURES: { key: FeatureKey; label: string }[] = Object.entries(
+  FEATURE_LABELS,
+).map(([key, label]) => ({ key: key as FeatureKey, label }))
 
 // Kept in sync with backend/internal/auth/handlers.go's allowedAvatarColors
 // — the six pouf "brand" tones meant for user-facing color choices (not
