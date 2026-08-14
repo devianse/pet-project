@@ -65,7 +65,10 @@ export default function AdminPage() {
 
   return (
     <Stack gap={5}>
-      <h1 className="text-2xl font-black text-ink">Admin</h1>
+      <div className="space-y-2">
+        <h1 className="text-2xl font-black text-ink">Admin</h1>
+        <p className="text-lg font-bold text-muted">Access</p>
+      </div>
       {error && (
         <p className="font-bold text-(--on-accent) bg-orange rounded-xl px-3 py-2 self-start">
           {error}
@@ -99,16 +102,19 @@ export default function AdminPage() {
                     const cell = cellKey(user.id, f.key)
                     return (
                       <td key={f.key} className="p-2">
-                        <Button
-                          size="sm"
-                          tone={granted ? 'mint' : 'purple'}
-                          variant={granted ? 'solid' : 'quiet'}
-                          loading={pending.has(cell)}
-                          aria-pressed={granted}
-                          onClick={() => toggle(user, f.key, granted)}
-                        >
-                          {granted ? 'Granted' : 'Grant'}
-                        </Button>
+                        <div className="w-24">
+                          <Button
+                            size="sm"
+                            block
+                            tone={granted ? 'mint' : 'purple'}
+                            variant={granted ? 'solid' : 'quiet'}
+                            loading={pending.has(cell)}
+                            aria-pressed={granted}
+                            onClick={() => toggle(user, f.key, granted)}
+                          >
+                            {granted ? 'Granted' : 'Grant'}
+                          </Button>
+                        </div>
                       </td>
                     )
                   })}
