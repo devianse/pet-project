@@ -38,6 +38,17 @@ func setupStore(t *testing.T) (*Store, *sql.DB) {
 	if err := store.EnsureSchema(context.Background()); err != nil {
 		t.Fatalf("ensuring schema: %v", err)
 	}
+	// admin_audit_log rows can reference these fixture usernames — e.g.
+	// real admin-panel activity against a same-named account created
+	// outside these tests, or internal/access's own fixtures under a
+	// different table — so clear referencing rows first. Without this,
+	// the users delete below fails on admin_audit_log_target_user_id_fkey
+	// whenever such a row exists.
+	if _, err := conn.ExecContext(context.Background(),
+		`DELETE FROM admin_audit_log WHERE actor_id IN (SELECT id FROM users WHERE username IN ('mike', 'alice', 'bob', 'dupe', 'carol'))
+		   OR target_user_id IN (SELECT id FROM users WHERE username IN ('mike', 'alice', 'bob', 'dupe', 'carol'))`); err != nil {
+		t.Fatalf("clearing referencing audit log rows: %v", err)
+	}
 	if _, err := conn.ExecContext(context.Background(),
 		"DELETE FROM users WHERE username IN ('mike', 'alice', 'bob', 'dupe', 'carol')"); err != nil {
 		t.Fatalf("clearing users table: %v", err)
