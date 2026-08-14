@@ -14,6 +14,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -92,6 +93,39 @@ func (c *RealClient) SendMessage(ctx context.Context, chatID int64, text string)
 		return err
 	}
 	_, err = c.post(ctx, "/sendMessage", body)
+	return err
+}
+
+// botCommand is one entry in the setMyCommands payload. Telegram requires
+// command (its "/" stripped) to be lowercase and command_scope-unique;
+// v1's commands already satisfy that so no validation is done here.
+type botCommand struct {
+	Command     string `json:"command"`
+	Description string `json:"description"`
+}
+
+// SetMyCommands populates Telegram's native command menu (the "/" button
+// next to the message box, and autocomplete suggestions) via the
+// setMyCommands endpoint. Intended to be called once at startup, after
+// every command is registered on Router — see cmd/api/telegram.go.
+func (c *RealClient) SetMyCommands(ctx context.Context, commands []Command) error {
+	botCommands := make([]botCommand, len(commands))
+	for i, cmd := range commands {
+		// Telegram's command field excludes the leading "/" and any
+		// trailing argument placeholder — Router's prefixes carry both
+		// (e.g. "/newnote ", with a trailing space commands like /notes
+		// don't have), so both are stripped here rather than asking
+		// Router to store two forms of the same prefix.
+		botCommands[i] = botCommand{
+			Command:     strings.TrimSpace(strings.TrimPrefix(cmd.Prefix, "/")),
+			Description: cmd.Description,
+		}
+	}
+	body, err := json.Marshal(map[string]any{"commands": botCommands})
+	if err != nil {
+		return err
+	}
+	_, err = c.post(ctx, "/setMyCommands", body)
 	return err
 }
 
