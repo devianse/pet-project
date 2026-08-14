@@ -6,6 +6,7 @@ import ImageProcessingPage from './features/image-processing/Page'
 import NotesPage from './features/notes/Page'
 import WatchlistPage from './features/watchlist/Page'
 import DateNightPage from './features/date-night/Page'
+import AdminPage from './features/admin/Page'
 import LoginPage from './features/auth/Page'
 import { AppShell } from './components/AppShell'
 import { AuthProvider, useAuth } from './shared/auth'
@@ -34,6 +35,18 @@ function RequireAuth({ children }: { children: ReactNode }) {
 function RequireFeature({ feature, children }: { feature: FeatureKey; children: ReactNode }) {
   const { user } = useAuth()
   if (!user || !user.features.includes(feature)) {
+    return <Navigate to="/" replace />
+  }
+  return <>{children}</>
+}
+
+// Role-gated, not feature-gated — admin-ness isn't a feature_access
+// grant. Redirects to / like RequireFeature does, for the same reason:
+// the page isn't there for this person, not an auth failure. This is
+// convenience only — real enforcement is access.RequireRole server-side.
+function RequireAdmin({ children }: { children: ReactNode }) {
+  const { user } = useAuth()
+  if (!user || user.role !== 'admin') {
     return <Navigate to="/" replace />
   }
   return <>{children}</>
@@ -90,6 +103,14 @@ export default function App() {
                         <RequireFeature feature="date-night">
                           <DateNightPage />
                         </RequireFeature>
+                      }
+                    />
+                    <Route
+                      path="/admin"
+                      element={
+                        <RequireAdmin>
+                          <AdminPage />
+                        </RequireAdmin>
                       }
                     />
                   </Routes>
