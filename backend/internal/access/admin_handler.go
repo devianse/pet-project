@@ -4,6 +4,7 @@ package access
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/devianse/pet-project/backend/internal/auth"
 	"github.com/devianse/pet-project/backend/internal/platform"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // userLister is the one thing AdminHandler needs from package auth,
@@ -21,6 +23,9 @@ type userLister interface {
 	ListUsers(ctx context.Context) ([]*auth.User, error)
 	FindByID(ctx context.Context, id int64) (*auth.User, error)
 	UpdateRole(ctx context.Context, id int64, role string) (*auth.User, error)
+	CreateUser(ctx context.Context, username, passwordHash, role string) (*auth.User, error)
+	SetActive(ctx context.Context, id int64, isActive bool) (*auth.User, error)
+	SetPasswordHash(ctx context.Context, id int64, passwordHash string) (*auth.User, error)
 }
 
 // AdminHandler serves the admin-only user/feature-grant management API
@@ -41,6 +46,7 @@ type adminUserResponse struct {
 	Username    string   `json:"username"`
 	DisplayName *string  `json:"display_name"`
 	Role        string   `json:"role"`
+	IsActive    bool     `json:"is_active"`
 	Features    []string `json:"features"`
 	CreatedAt   string   `json:"created_at"`
 }
@@ -59,22 +65,35 @@ func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 
 	resp := make([]adminUserResponse, len(users))
 	for i, u := range users {
-		features, err := h.accessStore.ListForUser(r.Context(), u.ID)
+		converted, err := h.toResponse(r.Context(), u)
 		if err != nil {
 			slog.Error("list features for user", "user_id", u.ID, "error", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
-		resp[i] = adminUserResponse{
-			ID:          u.ID,
-			Username:    u.Username,
-			DisplayName: u.DisplayName,
-			Role:        u.Role,
-			Features:    features,
-			CreatedAt:   u.CreatedAt.Format(time.RFC3339),
-		}
+		resp[i] = converted
 	}
 	platform.WriteJSON(w, http.StatusOK, resp)
+}
+
+// toResponse assembles the shared adminUserResponse shape, shared by
+// ListUsers and CreateUser so the two paths can't drift into reporting
+// different fields for the same user (same reasoning as auth.Handler's
+// buildMeResponse).
+func (h *AdminHandler) toResponse(ctx context.Context, u *auth.User) (adminUserResponse, error) {
+	features, err := h.accessStore.ListForUser(ctx, u.ID)
+	if err != nil {
+		return adminUserResponse{}, err
+	}
+	return adminUserResponse{
+		ID:          u.ID,
+		Username:    u.Username,
+		DisplayName: u.DisplayName,
+		Role:        u.Role,
+		IsActive:    u.IsActive,
+		Features:    features,
+		CreatedAt:   u.CreatedAt.Format(time.RFC3339),
+	}, nil
 }
 
 // knownFeatureKeysCSV mirrors cmd/grantaccess's knownFeatureKeys helper.
@@ -125,6 +144,158 @@ func (h *AdminHandler) GrantFeature(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := h.accessStore.Grant(r.Context(), userID, key); err != nil {
 		slog.Error("grant feature", "user_id", userID, "key", key, "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+type createUserRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Role     string `json:"role"`
+}
+
+// CreateUser is the UI equivalent of cmd/createuser — same validation
+// (non-empty username/password, a known role) and same bcrypt hashing,
+// duplicated rather than shared with the CLI since one lives in package
+// main and the other in package access, and it's a handful of lines.
+// Unlike the CLI, there's no -display-name flag: the created user sets
+// their own via the profile popover after first login (see
+// planning/decisions.md's "user lifecycle management" entry).
+func (h *AdminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
+	var req createUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "malformed JSON body", http.StatusBadRequest)
+		return
+	}
+	if strings.TrimSpace(req.Username) == "" {
+		http.Error(w, "username must not be empty", http.StatusBadRequest)
+		return
+	}
+	if req.Password == "" {
+		http.Error(w, "password must not be empty", http.StatusBadRequest)
+		return
+	}
+	if req.Role != "admin" && req.Role != "user" {
+		http.Error(w, `role must be "admin" or "user"`, http.StatusBadRequest)
+		return
+	}
+
+	hash, err := auth.HashPassword(req.Password)
+	if err != nil {
+		slog.Error("hash password", "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	user, err := h.users.CreateUser(r.Context(), req.Username, hash, req.Role)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			http.Error(w, "username already exists", http.StatusConflict)
+			return
+		}
+		slog.Error("create user", "username", req.Username, "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	resp, err := h.toResponse(r.Context(), user)
+	if err != nil {
+		slog.Error("list features for user", "user_id", user.ID, "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	platform.WriteJSON(w, http.StatusOK, resp)
+}
+
+type setActiveRequest struct {
+	IsActive bool `json:"is_active"`
+}
+
+// SetActive activates/deactivates user {id} — a soft, reversible
+// alternative to deleting the row (see planning/decisions.md). Mirrors
+// UpdateRole's shape exactly, including the self-guard: an admin can't
+// lock themselves out through this endpoint, checked server-side since a
+// UI-only disabled control is trivially bypassed with curl.
+func (h *AdminHandler) SetActive(w http.ResponseWriter, r *http.Request) {
+	userID, ok := platform.IDParam(r)
+	if !ok {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	var req setActiveRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "malformed JSON body", http.StatusBadRequest)
+		return
+	}
+
+	claims, ok := auth.ClaimsFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	callerID, err := claims.UserID()
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if callerID == userID {
+		http.Error(w, "can't deactivate your own account", http.StatusForbidden)
+		return
+	}
+
+	if !h.requireExistingUser(w, r, userID) {
+		return
+	}
+	if _, err := h.users.SetActive(r.Context(), userID, req.IsActive); err != nil {
+		slog.Error("set active", "user_id", userID, "is_active", req.IsActive, "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+type resetPasswordRequest struct {
+	Password string `json:"password"`
+}
+
+// ResetPassword overwrites user {id}'s password with an admin-supplied
+// value. No self-guard needed (unlike UpdateRole/SetActive) — an admin
+// resetting their own password isn't a privilege-loss risk the way
+// self-demote/self-deactivate are. The temp password itself is never
+// stored or logged; only its bcrypt hash persists.
+func (h *AdminHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	userID, ok := platform.IDParam(r)
+	if !ok {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	var req resetPasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "malformed JSON body", http.StatusBadRequest)
+		return
+	}
+	if req.Password == "" {
+		http.Error(w, "password must not be empty", http.StatusBadRequest)
+		return
+	}
+
+	if !h.requireExistingUser(w, r, userID) {
+		return
+	}
+
+	hash, err := auth.HashPassword(req.Password)
+	if err != nil {
+		slog.Error("hash password", "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if _, err := h.users.SetPasswordHash(r.Context(), userID, hash); err != nil {
+		slog.Error("reset password", "user_id", userID, "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}

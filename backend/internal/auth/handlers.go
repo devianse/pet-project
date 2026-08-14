@@ -114,7 +114,11 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	passwordOK := VerifyPassword(hashToCheck, req.Password)
 
-	if user == nil || !passwordOK {
+	// A deactivated account fails the same generic "invalid credentials"
+	// path as a wrong password — no signal to a caller that the account
+	// exists but was switched off, same enumeration-resistance reasoning
+	// as the unknown-username case above.
+	if user == nil || !passwordOK || !user.IsActive {
 		http.Error(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}

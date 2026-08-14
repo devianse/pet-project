@@ -66,9 +66,59 @@ the framing and roadmap these decisions feed into.
   re-checking the caller's id off JWT claims) — same defense-in-depth
   reasoning as `RequireRole`'s DB re-check. See `planning/history.md`
   step 11. Branch not yet merged to `main`.
+- ~~Admin panel expansion, user lifecycle management~~ — built on the
+  `user-lifecycle` branch: grouped, as planned, into one feature —
+  user creation, deactivate/reactivate, and admin-triggered password
+  reset — extending the same `/admin` Access section as the grants and
+  role UI. Deactivation is soft (`users.is_active`, blocks login,
+  fully reversible) — hard delete was explicitly ruled out as bad
+  practice for DB management. Password reset is "admin sets a temp
+  password, shown once in the UI" — no email infra added; self-service
+  email reset stays a deferred idea below. Backend: `auth.Store.
+  SetActive`/`SetPasswordHash`, `Handler.Login` now rejects a
+  deactivated user through the same generic 401 as a bad password (no
+  enumeration signal), and `access.AdminHandler` gained `CreateUser`
+  (mirrors `cmd/createuser`'s validation/hashing, 409 on duplicate
+  username), `SetActive` (self-deactivate blocked server-side, same
+  guard shape as self-demote), `ResetPassword` (never stores/logs the
+  plaintext). Frontend: a "Create user" form above the matrix, an
+  Active/Deactivated toggle per row, and a per-row inline
+  type-or-Generate password reset form with a one-time reveal banner.
+  TDD throughout on the backend (store + handler tests, each watched
+  fail first); frontend followed the existing untested convention.
+  Bounded-path work (brainstormed, short in-chat design, no spec doc) —
+  see `planning/history.md` step 12. Branch not yet merged to `main`;
+  same accepted gap as the two admin-panel branches before it — no
+  browser click-through, verified via backend tests and static review.
 
 ## Still open
 
+- **Admin panel expansion, deferred: observability** — two more
+  options from the same brainstorm, intentionally not started:
+  - **Audit trail + ops/system panel** (grouped) — an admin-action log
+    (who granted/revoked/promoted/demoted/created/deleted, when) next
+    to basic system health (DB connectivity, deployed version). Grouped
+    since both are small, read-only, single-page introspection into the
+    platform itself, unlike the option below.
+  - **App data moderation** (kept separate) — read visibility into
+    Notes/Watchlist/Date Night rows without SSHing in to query Postgres
+    directly. Kept separate since it spans three unrelated domain
+    schemas and is realistically its own multi-part effort, not a
+    bolt-on to the other two.
+
+- **Self-service email password reset** — deferred out of the user
+  lifecycle management feature above, where the admin-triggered reset
+  is landing as "admin sets a temp password, shown once" instead (no
+  email infra needed for that). This is the bigger version of the same
+  problem: a user-initiated "forgot password" flow, which needs email
+  sending added to the app for the first time. Noted as a real platform
+  feature for later, with the concrete use case already in view.
+
+  (Ruled out entirely: a feature-registry UI — `KnownFeatures` in
+  `backend/internal/access/features.go` is a hardcoded Go slice tied to
+  actual gated routes, not DB-editable data, so a UI to "manage" it
+  would create dead entries with nothing to gate. The existing grants
+  matrix already is the read view of known features × who has access.)
 - **WebSockets** (phase 2, second half) — not started. Real-time is
   meant to be a cross-cutting platform feature (see `PLANNING.md`'s
   "Platform shell" section), needed before Shopping List's live-sync

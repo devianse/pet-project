@@ -134,3 +134,43 @@ matches `PLANNING.md`'s shell-first order one-for-one — see that file's
     (store + handler tests, each watched fail before the code existed);
     no frontend test infra exists in this repo yet, so the UI change
     followed the same untested convention as the rest of `/admin`.
+12. **User lifecycle management** (done, on the `user-lifecycle` branch,
+    not yet merged) — the next admin-panel feature after a brainstorm of
+    what else belongs there once gating/grants existed (see
+    `planning/decisions.md`), grouping user creation, deactivate/
+    reactivate, and admin-triggered password reset into one pass since
+    all three mutate the same `users` row and extend the same `/admin`
+    Access section as steps 10-11. Backend: a new `users.is_active`
+    column (`ADD COLUMN IF NOT EXISTS`, defaults `true`), `auth.Store.
+    SetActive`/`SetPasswordHash`, `auth.Handler.Login` rejecting a
+    deactivated user through the same generic 401 as a wrong password
+    (no signal that distinguishes the two), and three new
+    `access.AdminHandler` endpoints: `CreateUser` (`POST /api/admin/
+    users`, mirrors `cmd/createuser`'s validation/bcrypt hashing, 409 on
+    a duplicate username), `SetActive` (`PUT /api/admin/users/{id}/
+    active`, self-deactivate blocked server-side off JWT claims — same
+    guard shape as `UpdateRole`'s self-demote block), and
+    `ResetPassword` (`POST /api/admin/users/{id}/reset-password`, no
+    self-guard needed since it isn't a privilege-loss risk; the
+    plaintext password is never stored or logged, only its hash).
+    Frontend: a "Create user" form card above the grants matrix
+    (username/password/role), an Active/Deactivated toggle per row
+    (disabled on the caller's own row, tone `up`/`down`), and a per-row
+    inline password-reset form (type-or-Generate, client-side generator
+    is a convenience only — the server never sees or trusts it) that
+    shows the new password once in a dismissible banner after a
+    successful reset, matching the chosen "admin sets a temp password,
+    shown once" design (self-service email reset was considered and
+    explicitly deferred — needs email infra this app doesn't have yet).
+    Deactivation is soft-delete only: hard delete was ruled out up front
+    as bad practice for DB management, so there's no cascade-delete
+    surface to reason about. Bounded-path work (brainstormed, short
+    in-chat design, no spec doc) — an extension of the existing admin
+    flow, not a new subsystem. TDD throughout on the backend (store +
+    handler tests for every new method/endpoint, each watched fail
+    first); frontend followed the same untested convention as the rest
+    of `/admin`. `govulncheck`/`npm audit`/`gitleaks` all ran clean
+    (`govulncheck` surfaced 6 pre-existing Go-toolchain stdlib
+    vulnerabilities unrelated to this branch — no new dependency was
+    added). Same accepted gap as steps 10-11: no browser click-through,
+    verified via backend tests and static review only.

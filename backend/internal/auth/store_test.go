@@ -39,7 +39,7 @@ func setupStore(t *testing.T) (*Store, *sql.DB) {
 		t.Fatalf("ensuring schema: %v", err)
 	}
 	if _, err := conn.ExecContext(context.Background(),
-		"DELETE FROM users WHERE username IN ('mike', 'alice', 'bob', 'dupe')"); err != nil {
+		"DELETE FROM users WHERE username IN ('mike', 'alice', 'bob', 'dupe', 'carol')"); err != nil {
 		t.Fatalf("clearing users table: %v", err)
 	}
 	return store, conn
@@ -205,6 +205,71 @@ func TestStore_UpdateRole(t *testing.T) {
 	}
 	if refetched.Role != "admin" {
 		t.Fatalf("expected persisted role %q, got %q", "admin", refetched.Role)
+	}
+}
+
+func TestStore_CreateUser_DefaultsToActive(t *testing.T) {
+	store, _ := setupStore(t)
+	ctx := context.Background()
+
+	created, err := store.CreateUser(ctx, "carol", "hashed-password", "user")
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	if !created.IsActive {
+		t.Fatalf("expected a freshly created user to be active, got %+v", created)
+	}
+}
+
+func TestStore_SetActive(t *testing.T) {
+	store, _ := setupStore(t)
+	ctx := context.Background()
+
+	created, err := store.CreateUser(ctx, "carol", "hashed-password", "user")
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	deactivated, err := store.SetActive(ctx, created.ID, false)
+	if err != nil {
+		t.Fatalf("SetActive(false): %v", err)
+	}
+	if deactivated.IsActive {
+		t.Fatalf("expected is_active false, got %+v", deactivated)
+	}
+
+	reactivated, err := store.SetActive(ctx, created.ID, true)
+	if err != nil {
+		t.Fatalf("SetActive(true): %v", err)
+	}
+	if !reactivated.IsActive {
+		t.Fatalf("expected is_active true, got %+v", reactivated)
+	}
+}
+
+func TestStore_SetPasswordHash(t *testing.T) {
+	store, _ := setupStore(t)
+	ctx := context.Background()
+
+	created, err := store.CreateUser(ctx, "carol", "old-hash", "user")
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	updated, err := store.SetPasswordHash(ctx, created.ID, "new-hash")
+	if err != nil {
+		t.Fatalf("SetPasswordHash: %v", err)
+	}
+	if updated.PasswordHash != "new-hash" {
+		t.Fatalf("expected updated password_hash %q, got %q", "new-hash", updated.PasswordHash)
+	}
+
+	refetched, err := store.FindByID(ctx, created.ID)
+	if err != nil {
+		t.Fatalf("FindByID: %v", err)
+	}
+	if refetched.PasswordHash != "new-hash" {
+		t.Fatalf("expected persisted password_hash %q, got %q", "new-hash", refetched.PasswordHash)
 	}
 }
 
