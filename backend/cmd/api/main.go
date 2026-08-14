@@ -10,9 +10,12 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/devianse/pet-project/backend/internal/access"
@@ -24,9 +27,19 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// shutdownTimeout bounds how long graceful shutdown waits for in-flight
+// requests to finish before forcing the listener closed.
+const shutdownTimeout = 10 * time.Second
+
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
+
+	// ctx is cancelled on SIGINT/SIGTERM and drives graceful shutdown
+	// below — passed to every long-lived background loop (currently just
+	// the Telegram poller) so nothing outlives the server itself.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	// .env is for local dev convenience only. In production the real
 	// env vars are set by the host/systemd/container, so a missing file
@@ -54,7 +67,7 @@ func main() {
 		os.Exit(1)
 	}
 	notesHandler := notes.NewHandler(notesStore)
-	startTelegramBot(logger, notesStore)
+	startTelegramBot(ctx, logger, notesStore)
 
 	tmdbToken := os.Getenv("TMDB_READ_ACCESS_TOKEN")
 	if tmdbToken == "" {
@@ -116,7 +129,7 @@ func main() {
 	// with a burst of 5 tolerates a genuine mistyped-password retry
 	// without leaving the endpoint open to unlimited guessing.
 	loginLimiter := newIPRateLimiter(rateEvery(time.Minute/5), 5)
-	go loginLimiter.startCleanup(context.Background(), 10*time.Minute, time.Hour)
+	go loginLimiter.startCleanup(ctx, 10*time.Minute, time.Hour)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", handleHealth(conn))
@@ -155,10 +168,33 @@ func main() {
 	}
 	addr := ":" + port
 	srv := newServer(addr, maxBytesMiddleware(mux))
-	logger.Info("api listening", "addr", addr)
-	if err := srv.ListenAndServe(); err != nil {
-		logger.Error("server failed", "error", err)
-		os.Exit(1)
+
+	// ListenAndServe runs in its own goroutine so the main goroutine is
+	// free to block on ctx below and drive shutdown — srv.Shutdown from
+	// the same goroutine that's still inside ListenAndServe would
+	// deadlock.
+	serveErr := make(chan error, 1)
+	go func() {
+		logger.Info("api listening", "addr", addr)
+		serveErr <- srv.ListenAndServe()
+	}()
+
+	select {
+	case err := <-serveErr:
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("server failed", "error", err)
+			os.Exit(1)
+		}
+	case <-ctx.Done():
+		logger.Info("shutdown signal received, draining connections", "timeout", shutdownTimeout)
+		// Independent timeout, not ctx — ctx is already cancelled at
+		// this point (that's what unblocked this select case), and
+		// Shutdown needs its own live deadline to bound the drain.
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			logger.Error("graceful shutdown failed", "error", err)
+		}
 	}
 }
 

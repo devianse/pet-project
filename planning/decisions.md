@@ -83,6 +83,15 @@ second copy.
   k8s" constraint elsewhere in `PLANNING.md`), whether it replaces or
   sits alongside the existing `slog`-based logging, and where it lands
   relative to WebSockets/Telegram in priority.
+- **Redis (cache) or RabbitMQ (queue)** — not started, no design yet,
+  no concrete driving need identified yet either. Two distinct options,
+  not a package: Redis as a cache layer (session/query caching) vs.
+  RabbitMQ as a message queue (candidate fit: Image Processing's worker
+  pool, per `PLANNING.md`'s "Second project to plug in" section, though
+  that section currently assumes an in-process queue, not a broker).
+  Either adds a 4th container to the one-VPS Compose stack — worth
+  weighing against that "no k8s / keep it simple" constraint before
+  committing to either.
 - **`notes`/feature multi-tenancy** — `notes` (and most other feature
   tables) currently have no owner column: single flat table, one
   implicit shared owner. Once a feature gets a real `user_id` column,

@@ -18,7 +18,12 @@ import (
 // DATABASE_URL/JWT_SECRET/TMDB_READ_ACCESS_TOKEN, this integration is
 // optional: nothing else in the app depends on the bot existing, so a
 // missing token disables this feature rather than failing startup.
-func startTelegramBot(logger *slog.Logger, notesStore *notes.Store) {
+//
+// ctx should be the process's shutdown context (cancelled on
+// SIGINT/SIGTERM), not context.Background() — the poller loop only
+// returns when its context is cancelled, so without this the goroutine
+// would outlive the rest of the server on every graceful shutdown.
+func startTelegramBot(ctx context.Context, logger *slog.Logger, notesStore *notes.Store) {
 	token := os.Getenv("TELEGRAM_BOT_TOKEN")
 	chatIDStr := os.Getenv("TELEGRAM_CHAT_ID")
 	if token == "" || chatIDStr == "" {
@@ -37,7 +42,7 @@ func startTelegramBot(logger *slog.Logger, notesStore *notes.Store) {
 
 	client := telegram.NewRealClient(token)
 	poller := telegram.NewPoller(client, chatID, router)
-	go poller.Run(context.Background())
+	go poller.Run(ctx)
 	logger.Info("telegram bot poller started")
 }
 
