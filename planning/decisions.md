@@ -42,6 +42,20 @@ the framing and roadmap these decisions feed into.
   branch landed, each implicitly exercising login/logout/redirect in
   normal dev use with no breakage surfacing. Accepted as sufficient
   (2026-08-14).
+- ~~Admin web UI for managing grants~~ — built on the `grants` branch:
+  a DB-re-checked `access.RequireRole` backend middleware,
+  `access.AdminHandler` (list users + grant/revoke per feature,
+  idempotent), and a `/admin` page (nav-gated to admins, a grant matrix
+  of users × features with per-cell toggle buttons). See
+  `docs/superpowers/specs/2026-08-14-admin-grants-ui-design.md` and
+  `docs/superpowers/plans/2026-08-14-admin-grants-ui.md`. Built via
+  `superpowers:subagent-driven-development`; one accepted gap, same
+  shape as the `jwt` branch's — the rendered frontend was verified via
+  a curl-driven server-side E2E pass plus static task review, not an
+  actual browser click-through (no browser automation tool available
+  in that session). Branch kept as-is, not yet merged to `main`
+  (2026-08-14) — the click-through above and role promote/demote (see
+  below) are open before/around that.
 
 ## Still open
 
@@ -70,11 +84,6 @@ the framing and roadmap these decisions feed into.
   not written yet; next step should go through
   `superpowers:brainstorming` properly before that gets written, per
   standing skill-usage rules.
-- **Admin web UI for managing grants** (deferred by the same design) —
-  CLI-only (`cmd/grantaccess`) for now. In progress as of 2026-08-14;
-  scoped to feature grants only — role promote/demote (see below) is a
-  separate, sequential follow-up task, not bundled into this one, though
-  it's expected to land on the same admin page once designed.
 - **Changing an existing user's role** — `cmd/createuser` only creates
   new accounts; there's no way yet to promote/demote an existing one
   (e.g. `user` → `admin`) short of editing the DB by hand. Noted while
@@ -83,5 +92,6 @@ the framing and roadmap these decisions feed into.
   that's no longer true (`role` now gates the admin bypass in
   `internal/access`, see the resolved permissions item above), so this
   is worth revisiting sooner than the original note implied. Sequenced
-  as a follow-up to the admin grants UI above (separate task/PR, not
-  bundled), expected to land on the same admin page once designed.
+  as a follow-up to the admin grants UI above, expected to land on the
+  same `/admin` page (the "Access" section is scoped to leave room for
+  it) now that the page exists.

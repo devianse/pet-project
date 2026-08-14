@@ -92,3 +92,25 @@ matches `PLANNING.md`'s shell-first order one-for-one — see that file's
     since only the resolved value changed. No design doc — scoped and
     approved conversationally as a bounded QOL pass, not an
     architectural change.
+10. **Admin grants UI** (done, on the `grants` branch, not yet merged) —
+    closes the "admin web UI for managing grants" follow-up deferred by
+    the feature-visibility design (step 9's sibling decision; see
+    `planning/decisions.md`). Backend: DB-re-checked `access.RequireRole`
+    middleware (same staleness-safe pattern as `HasFeature`'s admin
+    bypass) and `access.AdminHandler` (list users with their granted
+    features; idempotent grant/revoke per user/feature). Frontend: a
+    `/admin` page, nav-gated to admins only, showing a matrix of users ×
+    known features with a per-cell toggle button (Grant/Granted,
+    per-cell pending state so one in-flight toggle doesn't block the
+    rest of the table); heading reads "Admin" with an "Access" sub-label
+    left room for future admin sections (e.g. the still-open role
+    promote/demote follow-up) to land alongside it. See
+    `docs/superpowers/specs/2026-08-14-admin-grants-ui-design.md` and
+    `docs/superpowers/plans/2026-08-14-admin-grants-ui.md`. Built via
+    `superpowers:subagent-driven-development`, 10 tasks; one fix wave
+    off the final whole-branch review (refetch-on-failure in the toggle
+    handler, compile-time-exhaustive feature-label map). Same accepted
+    gap as the `jwt` branch (step 7): the rendered frontend was checked
+    via a curl-driven server-side E2E pass and static task review, not
+    an actual browser click-through — no browser automation tool was
+    available in that session.
