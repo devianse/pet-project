@@ -53,9 +53,8 @@ the framing and roadmap these decisions feed into.
   shape as the `jwt` branch's — the rendered frontend was verified via
   a curl-driven server-side E2E pass plus static task review, not an
   actual browser click-through (no browser automation tool available
-  in that session). Branch kept as-is, not yet merged to `main`
-  (2026-08-14) — the click-through above and role promote/demote (see
-  below) are open before/around that.
+  in that session). Merged to `main` via PR #12; the click-through gap
+  above is still open (see the browser-verification bullet above).
 - ~~Changing an existing user's role~~ — built on the `access` branch,
   landing on the same `/admin` page's Access section as the grants UI
   above: `auth.Store.UpdateRole`, a `PUT /api/admin/users/{id}/role`
@@ -65,7 +64,7 @@ the framing and roadmap these decisions feed into.
   (control disabled on the caller's own row) and server-side (403,
   re-checking the caller's id off JWT claims) — same defense-in-depth
   reasoning as `RequireRole`'s DB re-check. See `planning/history.md`
-  step 11. Branch not yet merged to `main`.
+  step 11. Merged to `main` via PR #13.
 - ~~Admin panel expansion, user lifecycle management~~ — built on the
   `user-lifecycle` branch: grouped, as planned, into one feature —
   user creation, deactivate/reactivate, and admin-triggered password
@@ -87,9 +86,9 @@ the framing and roadmap these decisions feed into.
   TDD throughout on the backend (store + handler tests, each watched
   fail first); frontend followed the existing untested convention.
   Bounded-path work (brainstormed, short in-chat design, no spec doc) —
-  see `planning/history.md` step 12. Branch not yet merged to `main`;
-  same accepted gap as the two admin-panel branches before it — no
-  browser click-through, verified via backend tests and static review.
+  see `planning/history.md` step 12. Merged to `main` via PR #15; same
+  accepted gap as the two admin-panel branches before it — no browser
+  click-through, verified via backend tests and static review.
 
 ## Still open
 

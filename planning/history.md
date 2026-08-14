@@ -92,7 +92,8 @@ matches `PLANNING.md`'s shell-first order one-for-one — see that file's
     since only the resolved value changed. No design doc — scoped and
     approved conversationally as a bounded QOL pass, not an
     architectural change.
-10. **Admin grants UI** (done, on the `grants` branch, not yet merged) —
+10. **Admin grants UI** (done, merged to `main` via the `grants` branch,
+    PR #12) —
     closes the "admin web UI for managing grants" follow-up deferred by
     the feature-visibility design (step 9's sibling decision; see
     `planning/decisions.md`). Backend: DB-re-checked `access.RequireRole`
@@ -114,8 +115,8 @@ matches `PLANNING.md`'s shell-first order one-for-one — see that file's
     via a curl-driven server-side E2E pass and static task review, not
     an actual browser click-through — no browser automation tool was
     available in that session.
-11. **Role promote/demote** (done, on the `access` branch, not yet
-    merged) — closes the "changing an existing user's role" follow-up
+11. **Role promote/demote** (done, merged to `main` via the `access`
+    branch, PR #13) — closes the "changing an existing user's role" follow-up
     left open by step 10, sequenced onto the same `/admin` page's Access
     section. Backend: `auth.Store.UpdateRole` and a
     `PUT /api/admin/users/{id}/role` handler on `access.AdminHandler`,
@@ -134,8 +135,8 @@ matches `PLANNING.md`'s shell-first order one-for-one — see that file's
     (store + handler tests, each watched fail before the code existed);
     no frontend test infra exists in this repo yet, so the UI change
     followed the same untested convention as the rest of `/admin`.
-12. **User lifecycle management** (done, on the `user-lifecycle` branch,
-    not yet merged) — the next admin-panel feature after a brainstorm of
+12. **User lifecycle management** (done, merged to `main` via the
+    `user-lifecycle` branch, PR #15) — the next admin-panel feature after a brainstorm of
     what else belongs there once gating/grants existed (see
     `planning/decisions.md`), grouping user creation, deactivate/
     reactivate, and admin-triggered password reset into one pass since
