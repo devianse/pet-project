@@ -354,3 +354,14 @@ export async function revokeFeature(userId: number, key: FeatureKey): Promise<vo
     throw new Error(`failed to revoke ${key}: ${res.status}`)
   }
 }
+
+export async function updateUserRole(userId: number, role: 'admin' | 'user'): Promise<void> {
+  const res = await request(`/api/admin/users/${userId}/role`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role }),
+  })
+  if (!res.ok) {
+    throw new Error(`failed to update role: ${res.status}`)
+  }
+}

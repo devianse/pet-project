@@ -141,6 +141,7 @@ func main() {
 	mux.Handle("GET /api/admin/users", requireAdmin(http.HandlerFunc(adminHandler.ListUsers)))
 	mux.Handle("POST /api/admin/users/{id}/features/{key}", requireAdmin(http.HandlerFunc(adminHandler.GrantFeature)))
 	mux.Handle("DELETE /api/admin/users/{id}/features/{key}", requireAdmin(http.HandlerFunc(adminHandler.RevokeFeature)))
+	mux.Handle("PUT /api/admin/users/{id}/role", requireAdmin(http.HandlerFunc(adminHandler.UpdateRole)))
 
 	port := os.Getenv("PORT")
 	if port == "" {

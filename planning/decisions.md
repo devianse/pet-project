@@ -56,6 +56,16 @@ the framing and roadmap these decisions feed into.
   in that session). Branch kept as-is, not yet merged to `main`
   (2026-08-14) — the click-through above and role promote/demote (see
   below) are open before/around that.
+- ~~Changing an existing user's role~~ — built on the `access` branch,
+  landing on the same `/admin` page's Access section as the grants UI
+  above: `auth.Store.UpdateRole`, a `PUT /api/admin/users/{id}/role`
+  handler, and a `user`/`admin` `<select>` per row (dropdown chosen over
+  a toggle since the role list may grow, unlike the fixed
+  Grant/Granted boolean). Self-demote is blocked both client-side
+  (control disabled on the caller's own row) and server-side (403,
+  re-checking the caller's id off JWT claims) — same defense-in-depth
+  reasoning as `RequireRole`'s DB re-check. See `planning/history.md`
+  step 11. Branch not yet merged to `main`.
 
 ## Still open
 
@@ -84,14 +94,3 @@ the framing and roadmap these decisions feed into.
   not written yet; next step should go through
   `superpowers:brainstorming` properly before that gets written, per
   standing skill-usage rules.
-- **Changing an existing user's role** — `cmd/createuser` only creates
-  new accounts; there's no way yet to promote/demote an existing one
-  (e.g. `user` → `admin`) short of editing the DB by hand. Noted while
-  seeding the first production admin account (2026-08-10 redeploy).
-  Originally filed as "not urgent, `role` isn't enforced anywhere yet" —
-  that's no longer true (`role` now gates the admin bypass in
-  `internal/access`, see the resolved permissions item above), so this
-  is worth revisiting sooner than the original note implied. Sequenced
-  as a follow-up to the admin grants UI above, expected to land on the
-  same `/admin` page (the "Access" section is scoped to leave room for
-  it) now that the page exists.

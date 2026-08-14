@@ -3,6 +3,7 @@ import {
   getAdminUsers,
   grantFeature,
   revokeFeature,
+  updateUserRole,
   KNOWN_FEATURES,
   type AdminUser,
   type FeatureKey,
@@ -10,6 +11,7 @@ import {
 import { Card } from '@/components/pouf/surface'
 import { Button } from '@/components/pouf/Button'
 import { Stack } from '@/components/pouf/layout'
+import { useAuth } from '@/shared/auth'
 
 // One in-flight toggle per (user, feature) cell, keyed "userId:key" — so
 // every other cell stays interactive while one grant/revoke call is out,
@@ -19,6 +21,7 @@ function cellKey(userId: number, key: FeatureKey) {
 }
 
 export default function AdminPage() {
+  const { user: currentUser } = useAuth()
   const [users, setUsers] = useState<AdminUser[]>([])
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState<Set<string>>(new Set())
@@ -63,6 +66,27 @@ export default function AdminPage() {
     }
   }
 
+  // Same cellKey/pending/refetch pattern as toggle() above — keyed
+  // "userId:role" so a role change and a feature toggle on the same row
+  // never contend for one pending flag.
+  async function changeRole(user: AdminUser, role: 'admin' | 'user') {
+    const cell = `${user.id}:role`
+    setError(null)
+    setPending((prev) => new Set(prev).add(cell))
+    try {
+      await updateUserRole(user.id, role)
+    } catch {
+      setError(`failed to update role for ${user.username}`)
+    } finally {
+      await load()
+      setPending((prev) => {
+        const next = new Set(prev)
+        next.delete(cell)
+        return next
+      })
+    }
+  }
+
   return (
     <Stack gap={5}>
       <div className="space-y-2">
@@ -81,6 +105,7 @@ export default function AdminPage() {
             <thead>
               <tr>
                 <th className="p-2 font-black text-ink">User</th>
+                <th className="p-2 font-black text-ink">Role</th>
                 {KNOWN_FEATURES.map((f) => (
                   <th key={f.key} className="p-2 font-black text-ink">
                     {f.label}
@@ -89,37 +114,48 @@ export default function AdminPage() {
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => (
-                <tr key={user.id}>
-                  <td className="p-2 font-bold text-ink">
-                    {user.display_name || user.username}
-                    {user.role === 'admin' && (
-                      <span className="ml-2 text-sm font-bold text-muted">admin</span>
-                    )}
-                  </td>
-                  {KNOWN_FEATURES.map((f) => {
-                    const granted = user.features.includes(f.key)
-                    const cell = cellKey(user.id, f.key)
-                    return (
-                      <td key={f.key} className="p-2">
-                        <div className="w-24">
-                          <Button
-                            size="sm"
-                            block
-                            tone={granted ? 'mint' : 'purple'}
-                            variant={granted ? 'solid' : 'quiet'}
-                            loading={pending.has(cell)}
-                            aria-pressed={granted}
-                            onClick={() => toggle(user, f.key, granted)}
-                          >
-                            {granted ? 'Granted' : 'Grant'}
-                          </Button>
-                        </div>
-                      </td>
-                    )
-                  })}
-                </tr>
-              ))}
+              {users.map((user) => {
+                const isSelf = user.id === currentUser?.id
+                const roleCell = `${user.id}:role`
+                return (
+                  <tr key={user.id}>
+                    <td className="p-2 font-bold text-ink">{user.display_name || user.username}</td>
+                    <td className="p-2">
+                      <select
+                        className="rounded-lg bg-bg px-2 py-1 font-bold text-ink disabled:opacity-50 disabled:cursor-not-allowed"
+                        value={user.role}
+                        disabled={isSelf || pending.has(roleCell)}
+                        title={isSelf ? "you can't change your own role" : undefined}
+                        onChange={(e) => changeRole(user, e.target.value as 'admin' | 'user')}
+                      >
+                        <option value="user">user</option>
+                        <option value="admin">admin</option>
+                      </select>
+                    </td>
+                    {KNOWN_FEATURES.map((f) => {
+                      const granted = user.features.includes(f.key)
+                      const cell = cellKey(user.id, f.key)
+                      return (
+                        <td key={f.key} className="p-2">
+                          <div className="w-24">
+                            <Button
+                              size="sm"
+                              block
+                              tone={granted ? 'mint' : 'purple'}
+                              variant={granted ? 'solid' : 'quiet'}
+                              loading={pending.has(cell)}
+                              aria-pressed={granted}
+                              onClick={() => toggle(user, f.key, granted)}
+                            >
+                              {granted ? 'Granted' : 'Grant'}
+                            </Button>
+                          </div>
+                        </td>
+                      )
+                    })}
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

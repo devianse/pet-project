@@ -182,6 +182,32 @@ func TestStore_UpdateProfile(t *testing.T) {
 	}
 }
 
+func TestStore_UpdateRole(t *testing.T) {
+	store, _ := setupStore(t)
+	ctx := context.Background()
+
+	created, err := store.CreateUser(ctx, "mike", "hashed-password", "user")
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	updated, err := store.UpdateRole(ctx, created.ID, "admin")
+	if err != nil {
+		t.Fatalf("UpdateRole: %v", err)
+	}
+	if updated.Role != "admin" {
+		t.Fatalf("expected role %q, got %q", "admin", updated.Role)
+	}
+
+	refetched, err := store.FindByID(ctx, created.ID)
+	if err != nil {
+		t.Fatalf("FindByID: %v", err)
+	}
+	if refetched.Role != "admin" {
+		t.Fatalf("expected persisted role %q, got %q", "admin", refetched.Role)
+	}
+}
+
 func TestStore_ListUsers(t *testing.T) {
 	store, _ := setupStore(t)
 	ctx := context.Background()

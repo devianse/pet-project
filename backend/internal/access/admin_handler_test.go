@@ -7,7 +7,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
+
+	"github.com/devianse/pet-project/backend/internal/auth"
 )
 
 func TestAdminHandler_ListUsers_ReturnsActualGrantsNotBypass(t *testing.T) {
@@ -171,5 +174,96 @@ func TestAdminHandler_GrantFeature_UnknownUserIDRejected(t *testing.T) {
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected 404 for an unknown user id, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// performUpdateRole builds a PUT /api/admin/users/{id}/role request,
+// wrapped in auth.Require so callerID's claims land in the request
+// context the same way the real middleware chain (requireAdmin ->
+// auth.Require) would produce them — UpdateRole reads the caller's own
+// id off those claims to enforce the self-demote guard.
+func performUpdateRole(t *testing.T, handler *AdminHandler, callerID, targetID int64, callerRole, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	secret := []byte("test-secret")
+	token, err := auth.SignToken(secret, callerID, "caller", callerRole)
+	if err != nil {
+		t.Fatalf("SignToken: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPut, "/api/admin/users/"+strconv.FormatInt(targetID, 10)+"/role", strings.NewReader(body))
+	req.SetPathValue("id", strconv.FormatInt(targetID, 10))
+	req.AddCookie(&http.Cookie{Name: "auth_token", Value: token})
+	rec := httptest.NewRecorder()
+
+	chained := auth.Require(secret)(http.HandlerFunc(handler.UpdateRole))
+	chained.ServeHTTP(rec, req)
+	return rec
+}
+
+func TestAdminHandler_UpdateRole_ChangesRole(t *testing.T) {
+	accessStore, authStore := setupAccessStore(t)
+	ctx := context.Background()
+	callerID := createTestUser(t, authStore, "access-admin", "admin")
+	targetID := createTestUser(t, authStore, "access-mike", "user")
+
+	handler := NewAdminHandler(accessStore, authStore)
+	rec := performUpdateRole(t, handler, callerID, targetID, "admin", `{"role":"admin"}`)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	updated, err := authStore.FindByID(ctx, targetID)
+	if err != nil {
+		t.Fatalf("FindByID: %v", err)
+	}
+	if updated.Role != "admin" {
+		t.Fatalf("expected role %q, got %q", "admin", updated.Role)
+	}
+}
+
+func TestAdminHandler_UpdateRole_UnknownRoleRejected(t *testing.T) {
+	accessStore, authStore := setupAccessStore(t)
+	callerID := createTestUser(t, authStore, "access-admin", "admin")
+	targetID := createTestUser(t, authStore, "access-mike", "user")
+
+	handler := NewAdminHandler(accessStore, authStore)
+	rec := performUpdateRole(t, handler, callerID, targetID, "admin", `{"role":"superuser"}`)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for unknown role, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestAdminHandler_UpdateRole_UnknownUserIDRejected(t *testing.T) {
+	accessStore, authStore := setupAccessStore(t)
+	callerID := createTestUser(t, authStore, "access-admin", "admin")
+
+	handler := NewAdminHandler(accessStore, authStore)
+	rec := performUpdateRole(t, handler, callerID, 999999999, "admin", `{"role":"admin"}`)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for an unknown user id, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestAdminHandler_UpdateRole_SelfChangeRejected(t *testing.T) {
+	accessStore, authStore := setupAccessStore(t)
+	ctx := context.Background()
+	callerID := createTestUser(t, authStore, "access-admin", "admin")
+
+	handler := NewAdminHandler(accessStore, authStore)
+	rec := performUpdateRole(t, handler, callerID, callerID, "admin", `{"role":"user"}`)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 when an admin targets their own id, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	unchanged, err := authStore.FindByID(ctx, callerID)
+	if err != nil {
+		t.Fatalf("FindByID: %v", err)
+	}
+	if unchanged.Role != "admin" {
+		t.Fatalf("expected role to stay %q, got %q", "admin", unchanged.Role)
 	}
 }

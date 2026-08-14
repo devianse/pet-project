@@ -114,3 +114,23 @@ matches `PLANNING.md`'s shell-first order one-for-one — see that file's
     via a curl-driven server-side E2E pass and static task review, not
     an actual browser click-through — no browser automation tool was
     available in that session.
+11. **Role promote/demote** (done, on the `access` branch, not yet
+    merged) — closes the "changing an existing user's role" follow-up
+    left open by step 10, sequenced onto the same `/admin` page's Access
+    section. Backend: `auth.Store.UpdateRole` and a
+    `PUT /api/admin/users/{id}/role` handler on `access.AdminHandler`,
+    validating the role value and 404ing on an unknown user id like the
+    grant/revoke handlers already do. Self-demote is blocked twice: the
+    frontend disables the control on the caller's own row, and the
+    handler independently 403s if the target id matches the caller's id
+    from JWT claims (a UI-only guard is trivially bypassed with curl,
+    and `RequireRole` already re-verifies role server-side for the same
+    reason). Frontend: the grants matrix gained a "Role" column with a
+    `user`/`admin` `<select>` per row — a dropdown rather than a toggle
+    button like the feature cells, since the role list may grow later
+    (unlike Grant/Granted's fixed boolean). Bounded-path work (brainstormed,
+    short in-chat design, no spec doc): the existing admin grants flow
+    was extended, not a new subsystem. TDD throughout on the backend
+    (store + handler tests, each watched fail before the code existed);
+    no frontend test infra exists in this repo yet, so the UI change
+    followed the same untested convention as the rest of `/admin`.
