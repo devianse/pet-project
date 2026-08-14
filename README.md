@@ -74,6 +74,9 @@ make lint-frontend    # oxlint
 make audit-frontend   # npm audit — known-vulnerability check on JS deps
 make audit-backend    # govulncheck ./... — known-vulnerability check on Go deps
 make scan-secrets     # gitleaks detect — scans git history for committed secrets
+make redeploy         # cd infra && GIT_SHA=<current short SHA> docker compose up -d --build
+infra/backup.sh <vps-host>            # pulls a fresh Postgres dump off the VPS to ~/pet-projects-backups/ (override via BACKUP_DIR), keeps the 5 most recent per db; manual/run-on-demand only
+infra/restore.sh <dump-file> [container]  # restores a .dump file into a running Postgres container (defaults to the docker compose postgres service)
 ```
 
 `audit-backend` needs `govulncheck` installed once:

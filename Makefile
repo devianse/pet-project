@@ -1,4 +1,4 @@
-.PHONY: dev-backend dev-frontend build-backend build-frontend lint-frontend scan-secrets audit-frontend audit-backend test-backend
+.PHONY: dev-backend dev-frontend build-backend build-frontend lint-frontend scan-secrets audit-frontend audit-backend test-backend redeploy
 
 dev-backend:
 	cd backend && go run ./cmd/api
@@ -34,3 +34,10 @@ audit-frontend:
 audit-backend:
 	@command -v govulncheck >/dev/null 2>&1 || { echo "govulncheck not found — run: go install golang.org/x/vuln/cmd/govulncheck@latest"; exit 1; }
 	cd backend && govulncheck ./...
+
+# Computes GIT_SHA fresh in the same command that uses it, so it can
+# never linger stale from an export left over in an earlier shell
+# session (see planning/decisions.md's "Redeploy's GIT_SHA export is
+# manual" entry). Run from the VPS after `git pull`, same as before.
+redeploy:
+	cd infra && GIT_SHA=$$(git -C .. rev-parse --short HEAD) docker compose up -d --build

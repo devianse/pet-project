@@ -28,8 +28,33 @@ second copy.
   `history.md` step 13. Two follow-ups deferred, see "Still open" below.
 - ~~Telegram bot dev+prod deployment (two-bot setup, `/help` command +
   native command menu)~~ — see `history.md` step 16.
+- ~~Redeploy's `GIT_SHA` export is manual~~ — replaced with a `make
+  redeploy` target (root `Makefile`) that computes `GIT_SHA` inline as
+  part of the same command that runs `docker compose up -d --build`,
+  so it can't linger stale from an `export` left over in an earlier
+  shell session. `infra/deployment-runbook/03-redeploy.md` updated to
+  match (2026-08-15).
+- ~~Postgres backup strategy~~ — see `history.md` step 18. One
+  follow-up left open, see "Still open" below
+  (`infra/deployment-runbook/` gitignore status).
 
 ## Still open
+
+- **`infra/deployment-runbook/` gitignore status** — surfaced while
+  closing out the Postgres backup strategy (`history.md` step 18): the
+  whole folder (`00-index.md` through `06-restore-backup.md`) is
+  gitignored (`.gitignore:34`, "Personal reference, not project docs",
+  grouped with `CHEATSHEET.local/`) and has never been committed on any
+  branch — yet `PLANNING.md` and this file's own `history.md` (steps 6,
+  7) describe it as the reviewed checklist for the planned Timeweb
+  migration, not personal scratch. Looks like a leftover from when the
+  folder was a single `.local.md`-suffixed file (renamed to a directory
+  without anyone revisiting the gitignore rule), but not confirmed
+  either way. Decided for now (2026-08-15): leave it gitignored rather
+  than guess — step 18's new runbook page exists on disk only,
+  uncommitted. Needs an explicit call: either untrack and commit the
+  whole folder, or confirm it's deliberately local-only and stop
+  describing it as shared documentation elsewhere.
 
 - **Admin panel expansion, deferred: app data moderation** — the
   remaining option from the same brainstorm as the audit-trail/ops
@@ -66,6 +91,18 @@ second copy.
   meant to be a cross-cutting platform feature (see `PLANNING.md`'s
   "Platform shell" section), needed before Shopping List's live-sync
   core loop or Date Night's deferred live-update follow-up can land.
+  Design in progress (2026-08-15), scoped to the shell only (connection
+  lifecycle, auth handshake, message protocol, hub/broadcast) — Ops
+  panel is the first consumer but is being split into its own follow-up
+  task rather than co-designed with the shell.
+- **Auth rewrite to an OAuth library** — raised while brainstorming
+  WebSockets auth (2026-08-15) as a "more secure" alternative to the
+  current hand-rolled JWT/httpOnly-cookie auth (`backend/internal/auth`).
+  Not decided or scoped — assessed as its own architectural effort (own
+  library choice, own questions about existing sessions/roles), not a
+  prerequisite for WebSockets. WS auth is being designed against
+  today's cookie behind a swappable interface so this can land later
+  without a WS redesign. Needs its own brainstorm when picked up.
 - **Telegram bot integration** — v1 (commands-in only: `/notes`,
   `/newnote`, `/help`) deployed to both dev and prod, two separate
   `@BotFather` bots per the routing constraint below; see
@@ -91,17 +128,6 @@ second copy.
   identical in `backend/.env` and `infra/.env` (still your own account
   either way); `TELEGRAM_BOT_TOKEN` differs (one bot for dev, one for
   prod).
-- **Redeploy's `GIT_SHA` export is manual, TODO to fix later** — every
-  redeploy (`infra/deployment-runbook/03-redeploy.md`) requires
-  running `export GIT_SHA=$(git -C .. rev-parse --short HEAD)` by hand
-  before `docker compose up -d --build`, so `/api/health`'s `version`
-  field reflects what's actually running. Easy to forget (stale
-  `version` silently lingers, nothing fails loudly), cumbersome to
-  redo every time by hand. No design yet — worth automating (e.g. a
-  Makefile/script wrapper around the redeploy `docker compose`
-  invocation, or reading the sha from inside the image at build time
-  instead of an externally-exported env var) when it's next annoying
-  enough to fix.
 - **OpenTelemetry** — not started, no design yet. Requested want:
   observability (traces/metrics/logs) across the backend, presumably the
   reverse proxy too. Open questions to resolve before this is buildable:
@@ -138,6 +164,21 @@ second copy.
   further (no advisory locks, no bespoke isolation abstraction).
   Once `notes` is user-scoped, the race disappears as a side effect of
   the ownership-scoped test convention above, and `-p 1` can go away.
+- **`cmd/api/main.go` split** — raised while writing the WebSockets shell
+  plan (2026-08-15): `main()` does everything in one ~200-line pass —
+  reads env vars, constructs every store/handler, registers every route
+  on `mux`, starts the server — with no `buildMux(...)`/`newApp(...)`
+  function that returns the wired router as a value. Noticed because it
+  meant Task 7 of that plan couldn't hit `/api/ws` through a real router
+  in a test without a refactor bigger than that task needed, so it
+  didn't add one (relied on `internal/realtime`'s own handler tests
+  instead — see `docs/superpowers/plans/2026-08-15-websockets-shell.md`
+  Task 7). Not a current bug — every route's behavior is already tested
+  at the package level (`internal/auth`, `internal/access`, etc.), and
+  `main.go` wiring is trusted by inspection like the rest of that file.
+  Worth a real look once it grows past this point (each new feature adds
+  ~10-15 more lines of route registration) or the next time something
+  wants to test routing/wiring directly — no design yet.
 - **Which of Shopping List / Image Processing** gets built first once
   phase 3 resumes, or whether they're built in parallel.
 - **OCR approach** (local Tesseract vs cloud API), if/when Image

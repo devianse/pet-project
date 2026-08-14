@@ -335,3 +335,64 @@ matches `PLANNING.md`'s shell-first order one-for-one — see that file's
     verification was build/typecheck plus a manual look at the running
     dev server rather than an automated or browser-driven check (no
     browser automation tool was available in this session).
+18. **Postgres backup strategy** (done, on the `something` branch,
+    pushed, PR not yet created) — a manual, run-on-demand way to pull a
+    Postgres backup off the VPS onto the operator's dev machine and
+    restore one, the concrete capability needed before an eventual VPS
+    migration. See
+    `docs/superpowers/specs/2026-08-15-postgres-backup-design.md` and
+    `docs/superpowers/plans/2026-08-15-postgres-backup.md`. Two
+    standalone scripts: `infra/backup.sh` SSHes into the VPS, runs
+    `pg_dump -Fc` inside the already-running `postgres` container via
+    `docker compose exec`, streams the result straight to a local
+    timestamped file under `~/pet-projects-backups/` (override via
+    `BACKUP_DIR`, deliberately outside the repo clone so a dump full of
+    usernames/password hashes/notes content can never land inside a
+    `git add -A`) with `umask 077` so it lands owner-only, then prunes
+    to the 5 most recent local dumps per db. `infra/restore.sh` runs
+    `pg_restore --clean --if-exists` against a target container
+    (`docker compose`'s `postgres` service by default, or an explicit
+    container name/ID for local testing) via `docker exec`. No cron, no
+    wrapper around deploy, no new accounts/credentials, no cloud
+    storage — both scripts are standalone commands run by hand, per the
+    design doc's explicit non-goals. Built via
+    `superpowers:subagent-driven-development`, 3 tasks (work in place on
+    `something`, no worktree, per explicit direction), each with an
+    independent implementer + task review (all clean, 2 minors
+    deferred). A final whole-branch review caught and fixed 2 Important
+    issues before merge-readiness: the migration walkthrough as written
+    told the operator to run `restore.sh` on their dev machine, where it
+    can't find the target container at all (`restore.sh` resolves via
+    `docker compose ps` against whatever Docker daemon it runs on — the
+    walkthrough now scps the dump to the new VPS and runs `restore.sh`
+    there); and neither script was mentioned anywhere in git-tracked
+    docs (`README.md`'s "Other commands" now lists both, plus the
+    previously-undocumented `make redeploy` target). Also fixed: a
+    stale runbook-path reference in `restore.sh`'s header, a unit-test
+    file whose "not -e" comment was silently defeated by sourcing
+    `backup.sh` (which re-enables `set -e`), and `restore.sh`'s
+    container-resolution hardened against `docker compose` itself
+    erroring (not just returning empty) with new test coverage for that
+    path. All fixes re-reviewed clean. Both shell test suites pass,
+    including `restore_test.sh`'s real dump → wipe → restore round-trip
+    against a throwaway `postgres:16-alpine` container. `make
+    test-backend` unaffected (no Go code touched).
+
+    One real mid-implementation surprise: the new runbook page
+    (`infra/deployment-runbook/06-restore-backup.md`, numbered 06 since
+    04/05 were already taken by files added after the plan was written)
+    could not be committed — `infra/deployment-runbook/` turned out to
+    already be entirely gitignored (`.gitignore:34`, "Personal
+    reference, not project docs", grouped with `CHEATSHEET.local/`),
+    despite `PLANNING.md`/this file describing it elsewhere as reviewed
+    project documentation for the Timeweb migration checklist (steps 6
+    and 7's build entries above). `git log --all` confirms the folder
+    has never been committed on any branch. Escalated directly rather
+    than guessed at; decided (2026-08-15) to leave it gitignored for
+    now — the new page and its edits to `00-index.md`/`04-known-gaps.md`
+    exist on disk only, uncommitted. Revisit whether the whole
+    `infra/deployment-runbook/` gitignore rule should be lifted — it
+    looks like a leftover from when the folder was a single
+    `.local.md`-suffixed file, not revisited when it became a real
+    multi-page directory (see "Still open" in `planning/decisions.md`
+    if this hasn't been resolved by the time this is read).
