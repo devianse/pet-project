@@ -43,9 +43,12 @@ terminals simultaneously, which README explains in detail.
 - **Never commit without being asked.** Staging/committing is the user's
   call, every time — not implied by "this looks done."
 - **A PR isn't ready unless `npm audit` (frontend), `govulncheck ./...`
-  (backend), and `gitleaks detect --source . -v` all pass clean.** Run
-  by hand before proposing a PR as done — no CI enforces this yet. See
-  README's "Other commands" for install/usage of each.
+  (backend), and `gitleaks detect --source . -v` all pass clean.** No CI
+  enforces this yet — the `closing-out-a-feature` skill runs these
+  automatically (plus planning-doc updates and dev-resource cleanup)
+  once a feature branch is done, before the merge/PR decision. See
+  README's "Other commands" for install/usage of each if running by
+  hand.
 - **Env vars**: each app has a `.env.example` (checked in) and `.env`
   (gitignored, real values) — see README's "Env config" section for the
   actual var list. Backend loads its via `godotenv`; frontend's
