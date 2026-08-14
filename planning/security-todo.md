@@ -25,4 +25,7 @@ as genuinely dependent on later phases, not skipped by oversight:
   same-origin), revisit if that changes
 - **CSP tightening** as the frontend grows past its current shape
 - **WebSocket auth** (phase 2 feature, doesn't exist yet)
-- **Postgres backup strategy** / secrets rotation
+- **Postgres backup strategy** — designed, not yet implemented: see
+  `docs/superpowers/specs/2026-08-15-postgres-backup-design.md`
+  (manual `infra/backup.sh`/`infra/restore.sh`, pull-to-dev-machine,
+  no cloud storage). / secrets rotation

@@ -28,6 +28,12 @@ second copy.
   `history.md` step 13. Two follow-ups deferred, see "Still open" below.
 - ~~Telegram bot dev+prod deployment (two-bot setup, `/help` command +
   native command menu)~~ — see `history.md` step 16.
+- ~~Redeploy's `GIT_SHA` export is manual~~ — replaced with a `make
+  redeploy` target (root `Makefile`) that computes `GIT_SHA` inline as
+  part of the same command that runs `docker compose up -d --build`,
+  so it can't linger stale from an `export` left over in an earlier
+  shell session. `infra/deployment-runbook/03-redeploy.md` updated to
+  match (2026-08-15).
 
 ## Still open
 
@@ -66,6 +72,18 @@ second copy.
   meant to be a cross-cutting platform feature (see `PLANNING.md`'s
   "Platform shell" section), needed before Shopping List's live-sync
   core loop or Date Night's deferred live-update follow-up can land.
+  Design in progress (2026-08-15), scoped to the shell only (connection
+  lifecycle, auth handshake, message protocol, hub/broadcast) — Ops
+  panel is the first consumer but is being split into its own follow-up
+  task rather than co-designed with the shell.
+- **Auth rewrite to an OAuth library** — raised while brainstorming
+  WebSockets auth (2026-08-15) as a "more secure" alternative to the
+  current hand-rolled JWT/httpOnly-cookie auth (`backend/internal/auth`).
+  Not decided or scoped — assessed as its own architectural effort (own
+  library choice, own questions about existing sessions/roles), not a
+  prerequisite for WebSockets. WS auth is being designed against
+  today's cookie behind a swappable interface so this can land later
+  without a WS redesign. Needs its own brainstorm when picked up.
 - **Telegram bot integration** — v1 (commands-in only: `/notes`,
   `/newnote`, `/help`) deployed to both dev and prod, two separate
   `@BotFather` bots per the routing constraint below; see
@@ -91,17 +109,6 @@ second copy.
   identical in `backend/.env` and `infra/.env` (still your own account
   either way); `TELEGRAM_BOT_TOKEN` differs (one bot for dev, one for
   prod).
-- **Redeploy's `GIT_SHA` export is manual, TODO to fix later** — every
-  redeploy (`infra/deployment-runbook/03-redeploy.md`) requires
-  running `export GIT_SHA=$(git -C .. rev-parse --short HEAD)` by hand
-  before `docker compose up -d --build`, so `/api/health`'s `version`
-  field reflects what's actually running. Easy to forget (stale
-  `version` silently lingers, nothing fails loudly), cumbersome to
-  redo every time by hand. No design yet — worth automating (e.g. a
-  Makefile/script wrapper around the redeploy `docker compose`
-  invocation, or reading the sha from inside the image at build time
-  instead of an externally-exported env var) when it's next annoying
-  enough to fix.
 - **OpenTelemetry** — not started, no design yet. Requested want:
   observability (traces/metrics/logs) across the backend, presumably the
   reverse proxy too. Open questions to resolve before this is buildable:
