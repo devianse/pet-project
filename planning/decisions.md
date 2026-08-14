@@ -34,8 +34,27 @@ second copy.
   so it can't linger stale from an `export` left over in an earlier
   shell session. `infra/deployment-runbook/03-redeploy.md` updated to
   match (2026-08-15).
+- ~~Postgres backup strategy~~ — see `history.md` step 18. One
+  follow-up left open, see "Still open" below
+  (`infra/deployment-runbook/` gitignore status).
 
 ## Still open
+
+- **`infra/deployment-runbook/` gitignore status** — surfaced while
+  closing out the Postgres backup strategy (`history.md` step 18): the
+  whole folder (`00-index.md` through `06-restore-backup.md`) is
+  gitignored (`.gitignore:34`, "Personal reference, not project docs",
+  grouped with `CHEATSHEET.local/`) and has never been committed on any
+  branch — yet `PLANNING.md` and this file's own `history.md` (steps 6,
+  7) describe it as the reviewed checklist for the planned Timeweb
+  migration, not personal scratch. Looks like a leftover from when the
+  folder was a single `.local.md`-suffixed file (renamed to a directory
+  without anyone revisiting the gitignore rule), but not confirmed
+  either way. Decided for now (2026-08-15): leave it gitignored rather
+  than guess — step 18's new runbook page exists on disk only,
+  uncommitted. Needs an explicit call: either untrack and commit the
+  whole folder, or confirm it's deliberately local-only and stop
+  describing it as shared documentation elsewhere.
 
 - **Admin panel expansion, deferred: app data moderation** — the
   remaining option from the same brainstorm as the audit-trail/ops
