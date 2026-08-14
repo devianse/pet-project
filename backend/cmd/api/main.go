@@ -8,6 +8,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -117,7 +118,7 @@ func main() {
 	go loginLimiter.startCleanup(context.Background(), 10*time.Minute, time.Hour)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/health", handleHealth)
+	mux.HandleFunc("GET /api/health", handleHealth(conn))
 	mux.Handle("POST /api/auth/login", rateLimitMiddleware(loginLimiter, http.HandlerFunc(authHandler.Login)))
 	mux.HandleFunc("POST /api/auth/logout", authHandler.Logout)
 	mux.HandleFunc("GET /api/me", authHandler.Me)
@@ -145,6 +146,7 @@ func main() {
 	mux.Handle("PUT /api/admin/users/{id}/role", requireAdmin(http.HandlerFunc(adminHandler.UpdateRole)))
 	mux.Handle("PUT /api/admin/users/{id}/active", requireAdmin(http.HandlerFunc(adminHandler.SetActive)))
 	mux.Handle("POST /api/admin/users/{id}/reset-password", requireAdmin(http.HandlerFunc(adminHandler.ResetPassword)))
+	mux.Handle("GET /api/admin/audit-log", requireAdmin(http.HandlerFunc(adminHandler.AuditLog)))
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -159,7 +161,31 @@ func main() {
 	}
 }
 
-func handleHealth(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+// handleHealth reports basic liveness (always "ok" if the process is
+// serving requests at all), DB connectivity (a real PingContext, not just
+// "the pool object exists"), and the running build's git SHA — kept on
+// this existing unauthenticated endpoint since health checks are
+// conventionally public (load balancers, uptime monitors) and none of
+// this is sensitive. GIT_SHA is a plain runtime env var, not baked in at
+// build time — see infra/docker-compose.yml and the deploy runbook, which
+// set it from `git rev-parse --short HEAD` the same way TMDB_READ_ACCESS_
+// TOKEN and friends are already passed through.
+func handleHealth(conn *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		overallStatus, dbStatus, httpStatus := "ok", "ok", http.StatusOK
+		if err := conn.PingContext(r.Context()); err != nil {
+			overallStatus, dbStatus, httpStatus = "degraded", "unreachable", http.StatusServiceUnavailable
+		}
+		version := os.Getenv("GIT_SHA")
+		if version == "" {
+			version = "unknown"
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(httpStatus)
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":  overallStatus,
+			"db":      dbStatus,
+			"version": version,
+		})
+	}
 }

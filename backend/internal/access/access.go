@@ -4,6 +4,7 @@ package access
 import (
 	"context"
 	"database/sql"
+	"time"
 )
 
 // Store owns the features/feature_access tables. Mirrors every other
@@ -46,7 +47,73 @@ func (s *Store) EnsureSchema(ctx context.Context) error {
 			return err
 		}
 	}
+	if _, err := s.conn.ExecContext(ctx, `
+		CREATE TABLE IF NOT EXISTS admin_audit_log (
+			id             BIGSERIAL PRIMARY KEY,
+			actor_id       BIGINT NOT NULL REFERENCES users(id),
+			action         TEXT NOT NULL,
+			target_user_id BIGINT REFERENCES users(id),
+			detail         TEXT NOT NULL DEFAULT '',
+			created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+		)
+	`); err != nil {
+		return err
+	}
 	return nil
+}
+
+// AuditEntry is one row of the admin-action log, joined with the actor's
+// and (if any) target's username for display — the audit page has exactly
+// one reader (the admin UI table), so there's no need to expose raw ids
+// and make every caller do that join itself.
+type AuditEntry struct {
+	ID             int64
+	ActorUsername  string
+	Action         string
+	TargetUsername *string
+	Detail         string
+	CreatedAt      time.Time
+}
+
+// LogAction records one admin action. targetUserID is nil for actions with
+// no single target (e.g. create_user, where the newly created user *is*
+// the subject but recording it as target_user_id would be redundant with
+// what's already in detail — kept nil-able for actions like a future
+// bulk operation that has no single target at all).
+func (s *Store) LogAction(ctx context.Context, actorID int64, action string, targetUserID *int64, detail string) error {
+	_, err := s.conn.ExecContext(ctx, `
+		INSERT INTO admin_audit_log (actor_id, action, target_user_id, detail)
+		VALUES ($1, $2, $3, $4)
+	`, actorID, action, targetUserID, detail)
+	return err
+}
+
+// ListAuditLog returns the most recent 100 audit entries, newest first —
+// far more than this app's admin-action volume needs, so a hard limit
+// keeps the query trivial without a pagination UI.
+func (s *Store) ListAuditLog(ctx context.Context) ([]AuditEntry, error) {
+	rows, err := s.conn.QueryContext(ctx, `
+		SELECT l.id, actor.username, l.action, target.username, l.detail, l.created_at
+		FROM admin_audit_log l
+		JOIN users actor ON actor.id = l.actor_id
+		LEFT JOIN users target ON target.id = l.target_user_id
+		ORDER BY l.created_at DESC, l.id DESC
+		LIMIT 100
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	entries := []AuditEntry{}
+	for rows.Next() {
+		var e AuditEntry
+		if err := rows.Scan(&e.ID, &e.ActorUsername, &e.Action, &e.TargetUsername, &e.Detail, &e.CreatedAt); err != nil {
+			return nil, err
+		}
+		entries = append(entries, e)
+	}
+	return entries, rows.Err()
 }
 
 // Grant is idempotent — granting an already-granted feature is a no-op,

@@ -92,7 +92,8 @@ matches `PLANNING.md`'s shell-first order one-for-one — see that file's
     since only the resolved value changed. No design doc — scoped and
     approved conversationally as a bounded QOL pass, not an
     architectural change.
-10. **Admin grants UI** (done, on the `grants` branch, not yet merged) —
+10. **Admin grants UI** (done, merged to `main` via the `grants` branch,
+    PR #12) —
     closes the "admin web UI for managing grants" follow-up deferred by
     the feature-visibility design (step 9's sibling decision; see
     `planning/decisions.md`). Backend: DB-re-checked `access.RequireRole`
@@ -114,8 +115,8 @@ matches `PLANNING.md`'s shell-first order one-for-one — see that file's
     via a curl-driven server-side E2E pass and static task review, not
     an actual browser click-through — no browser automation tool was
     available in that session.
-11. **Role promote/demote** (done, on the `access` branch, not yet
-    merged) — closes the "changing an existing user's role" follow-up
+11. **Role promote/demote** (done, merged to `main` via the `access`
+    branch, PR #13) — closes the "changing an existing user's role" follow-up
     left open by step 10, sequenced onto the same `/admin` page's Access
     section. Backend: `auth.Store.UpdateRole` and a
     `PUT /api/admin/users/{id}/role` handler on `access.AdminHandler`,
@@ -134,8 +135,8 @@ matches `PLANNING.md`'s shell-first order one-for-one — see that file's
     (store + handler tests, each watched fail before the code existed);
     no frontend test infra exists in this repo yet, so the UI change
     followed the same untested convention as the rest of `/admin`.
-12. **User lifecycle management** (done, on the `user-lifecycle` branch,
-    not yet merged) — the next admin-panel feature after a brainstorm of
+12. **User lifecycle management** (done, merged to `main` via the
+    `user-lifecycle` branch, PR #15) — the next admin-panel feature after a brainstorm of
     what else belongs there once gating/grants existed (see
     `planning/decisions.md`), grouping user creation, deactivate/
     reactivate, and admin-triggered password reset into one pass since
@@ -174,3 +175,39 @@ matches `PLANNING.md`'s shell-first order one-for-one — see that file's
     vulnerabilities unrelated to this branch — no new dependency was
     added). Same accepted gap as steps 10-11: no browser click-through,
     verified via backend tests and static review only.
+13. **Audit trail + ops/system panel** (done, on the `audit-ops` branch,
+    not yet merged) — the first of the two deferred admin-panel
+    observability options from step 12's decision (the other, app data
+    moderation, stays deferred — see `planning/decisions.md`). A
+    read-only introspection page added to the same `/admin` panel as
+    steps 10-12: an admin-action audit log (who granted/revoked
+    features, created/deactivated/reactivated a user, reset a password,
+    or changed a role, and when) plus basic system health (DB
+    connectivity, deployed git SHA). Backend: a new `admin_audit_log`
+    table (actor, action, optional target user, free-text detail,
+    timestamp), `access.Store.LogAction`/`ListAuditLog` (newest-first,
+    capped at 100 rows), and a `GET /api/admin/audit-log` handler.
+    Every existing mutating admin handler (`GrantFeature`,
+    `RevokeFeature`, `CreateUser`, `SetActive`, `ResetPassword`,
+    `UpdateRole`) now calls a shared `logAction` helper after a
+    successful write — a logging failure doesn't fail the request
+    itself. `cmd/api`'s `/api/health` handler was extended to ping the
+    DB and report a `GIT_SHA`-sourced version string (falls back to
+    "unknown" locally where that env var isn't set); `infra/
+    docker-compose.yml` and both deployment-runbook docs pass `GIT_SHA`
+    through at deploy time. Frontend: a new "Ops" section on `/admin`
+    below the existing Access table — a system-health card and an
+    audit-log table (When/Actor/Action/Target/Detail). Bounded-path
+    work (brainstormed, short in-chat design approved, no spec doc) —
+    an extension of the existing admin flow, not a new subsystem. TDD
+    throughout on the backend (store + handler tests, each watched fail
+    first, run against real Postgres); frontend followed the same
+    untested convention as the rest of `/admin`. Verified end-to-end
+    with a curl-driven session against a locally running backend (real
+    JWT cookie, grant + deactivate actions, confirmed both showed up
+    correctly ordered in the audit log) — same accepted browser-
+    click-through gap as steps 10-12. `govulncheck`/`npm audit`/
+    `gitleaks` all ran clean (`govulncheck` surfaced the same 6
+    pre-existing Go-toolchain stdlib vulnerabilities as step 12,
+    confirmed present even with this branch's changes stashed out — not
+    introduced here; no new dependency was added).

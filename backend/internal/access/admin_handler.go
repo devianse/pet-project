@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -108,6 +109,64 @@ func knownFeatureKeysCSV() string {
 	return strings.Join(keys, ", ")
 }
 
+// actorFromClaims extracts the caller's user id from the JWT claims
+// auth.Require already verified, writing 401 if they're missing. Shared by
+// every mutating handler below so each can record itself as the audit
+// log's actor; UpdateRole/SetActive also reuse it for their self-guard
+// checks instead of extracting claims twice.
+func (h *AdminHandler) actorFromClaims(w http.ResponseWriter, r *http.Request) (int64, bool) {
+	claims, ok := auth.ClaimsFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return 0, false
+	}
+	callerID, err := claims.UserID()
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return 0, false
+	}
+	return callerID, true
+}
+
+// logAction is a thin wrapper around accessStore.LogAction that only logs
+// the failure — an audit-write error shouldn't turn an otherwise-successful
+// admin action into a 500 for the caller, since the mutation itself already
+// committed.
+func (h *AdminHandler) logAction(ctx context.Context, actorID int64, action string, targetUserID *int64, detail string) {
+	if err := h.accessStore.LogAction(ctx, actorID, action, targetUserID, detail); err != nil {
+		slog.Error("log audit action", "action", action, "actor_id", actorID, "error", err)
+	}
+}
+
+type auditEntryResponse struct {
+	ActorUsername  string  `json:"actor_username"`
+	Action         string  `json:"action"`
+	TargetUsername *string `json:"target_username"`
+	Detail         string  `json:"detail"`
+	CreatedAt      string  `json:"created_at"`
+}
+
+// AuditLog returns the most recent admin-action log entries, newest first.
+func (h *AdminHandler) AuditLog(w http.ResponseWriter, r *http.Request) {
+	entries, err := h.accessStore.ListAuditLog(r.Context())
+	if err != nil {
+		slog.Error("list audit log", "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	resp := make([]auditEntryResponse, len(entries))
+	for i, e := range entries {
+		resp[i] = auditEntryResponse{
+			ActorUsername:  e.ActorUsername,
+			Action:         e.Action,
+			TargetUsername: e.TargetUsername,
+			Detail:         e.Detail,
+			CreatedAt:      e.CreatedAt.Format(time.RFC3339),
+		}
+	}
+	platform.WriteJSON(w, http.StatusOK, resp)
+}
+
 // requireExistingUser 404s if id doesn't match a real user, so a typo'd
 // or stale id in the admin UI gets a clean not-found instead of falling
 // through to Grant's feature_access foreign-key violation (a generic
@@ -139,6 +198,10 @@ func (h *AdminHandler) GrantFeature(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unknown feature key (known: "+knownFeatureKeysCSV()+")", http.StatusBadRequest)
 		return
 	}
+	actorID, ok := h.actorFromClaims(w, r)
+	if !ok {
+		return
+	}
 	if !h.requireExistingUser(w, r, userID) {
 		return
 	}
@@ -147,6 +210,7 @@ func (h *AdminHandler) GrantFeature(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	h.logAction(r.Context(), actorID, "grant_feature", &userID, "feature="+key)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -181,6 +245,10 @@ func (h *AdminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `role must be "admin" or "user"`, http.StatusBadRequest)
 		return
 	}
+	actorID, ok := h.actorFromClaims(w, r)
+	if !ok {
+		return
+	}
 
 	hash, err := auth.HashPassword(req.Password)
 	if err != nil {
@@ -200,6 +268,7 @@ func (h *AdminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	h.logAction(r.Context(), actorID, "create_user", &user.ID, "role="+req.Role)
 
 	resp, err := h.toResponse(r.Context(), user)
 	if err != nil {
@@ -232,14 +301,8 @@ func (h *AdminHandler) SetActive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	claims, ok := auth.ClaimsFromContext(r.Context())
+	callerID, ok := h.actorFromClaims(w, r)
 	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-	callerID, err := claims.UserID()
-	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if callerID == userID {
@@ -255,6 +318,7 @@ func (h *AdminHandler) SetActive(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	h.logAction(r.Context(), callerID, "set_active", &userID, "is_active="+strconv.FormatBool(req.IsActive))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -283,6 +347,10 @@ func (h *AdminHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "password must not be empty", http.StatusBadRequest)
 		return
 	}
+	actorID, ok := h.actorFromClaims(w, r)
+	if !ok {
+		return
+	}
 
 	if !h.requireExistingUser(w, r, userID) {
 		return
@@ -299,6 +367,7 @@ func (h *AdminHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	h.logAction(r.Context(), actorID, "reset_password", &userID, "")
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -317,6 +386,10 @@ func (h *AdminHandler) RevokeFeature(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unknown feature key (known: "+knownFeatureKeysCSV()+")", http.StatusBadRequest)
 		return
 	}
+	actorID, ok := h.actorFromClaims(w, r)
+	if !ok {
+		return
+	}
 	if !h.requireExistingUser(w, r, userID) {
 		return
 	}
@@ -325,6 +398,7 @@ func (h *AdminHandler) RevokeFeature(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	h.logAction(r.Context(), actorID, "revoke_feature", &userID, "feature="+key)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -356,14 +430,8 @@ func (h *AdminHandler) UpdateRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	claims, ok := auth.ClaimsFromContext(r.Context())
+	callerID, ok := h.actorFromClaims(w, r)
 	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-	callerID, err := claims.UserID()
-	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if callerID == userID {
@@ -379,5 +447,6 @@ func (h *AdminHandler) UpdateRole(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	h.logAction(r.Context(), callerID, "update_role", &userID, "role="+req.Role)
 	w.WriteHeader(http.StatusNoContent)
 }

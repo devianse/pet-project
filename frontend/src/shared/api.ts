@@ -24,11 +24,14 @@ async function request(input: RequestInfo | URL, init?: RequestInit): Promise<Re
   return res
 }
 
-export async function getHealth(): Promise<{ status: string }> {
+// GET /api/health also 503s when the DB is unreachable — that's still a
+// meaningful response for the admin ops panel to render (not a thrown
+// error), so this reads the body regardless of res.ok rather than
+// gating on it the way every other GET here does.
+export type HealthStatus = { status: string; db: string; version: string }
+
+export async function getHealth(): Promise<HealthStatus> {
   const res = await fetch('/api/health')
-  if (!res.ok) {
-    throw new Error(`health check failed: ${res.status}`)
-  }
   return res.json()
 }
 
@@ -393,6 +396,25 @@ export async function setUserActive(userId: number, isActive: boolean): Promise<
   if (!res.ok) {
     throw new Error(`failed to update active state: ${res.status}`)
   }
+}
+
+export type AdminAuditEntry = {
+  actor_username: string
+  action: string
+  target_username: string | null
+  detail: string
+  created_at: string
+}
+
+// GET /api/admin/audit-log returns the last 100 admin actions, newest
+// first — no pagination, matches backend/internal/access.Store.
+// ListAuditLog's fixed LIMIT.
+export async function getAuditLog(): Promise<AdminAuditEntry[]> {
+  const res = await request('/api/admin/audit-log')
+  if (!res.ok) {
+    throw new Error(`failed to load audit log: ${res.status}`)
+  }
+  return res.json()
 }
 
 export async function resetUserPassword(userId: number, password: string): Promise<void> {
