@@ -69,6 +69,32 @@ the framing and roadmap these decisions feed into.
 
 ## Still open
 
+- **Admin panel expansion, next up: user lifecycle management** —
+  locked in as the next admin feature (2026-08-14), grouping three of
+  the options surfaced when brainstorming what else belongs in
+  `/admin`: user creation (currently `cmd/createuser`-only, no UI),
+  deactivate/delete a user, and admin-triggered password reset. Grouped
+  together since all three mutate the same `users` row and extend the
+  same Access section the grants/role UI already lives in. Design not
+  started yet.
+- **Admin panel expansion, deferred: observability** — two more
+  options from the same brainstorm, intentionally not started:
+  - **Audit trail + ops/system panel** (grouped) — an admin-action log
+    (who granted/revoked/promoted/demoted/created/deleted, when) next
+    to basic system health (DB connectivity, deployed version). Grouped
+    since both are small, read-only, single-page introspection into the
+    platform itself, unlike the option below.
+  - **App data moderation** (kept separate) — read visibility into
+    Notes/Watchlist/Date Night rows without SSHing in to query Postgres
+    directly. Kept separate since it spans three unrelated domain
+    schemas and is realistically its own multi-part effort, not a
+    bolt-on to the other two.
+
+  (Ruled out entirely: a feature-registry UI — `KnownFeatures` in
+  `backend/internal/access/features.go` is a hardcoded Go slice tied to
+  actual gated routes, not DB-editable data, so a UI to "manage" it
+  would create dead entries with nothing to gate. The existing grants
+  matrix already is the read view of known features × who has access.)
 - **WebSockets** (phase 2, second half) — not started. Real-time is
   meant to be a cross-cutting platform feature (see `PLANNING.md`'s
   "Platform shell" section), needed before Shopping List's live-sync
