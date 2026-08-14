@@ -126,6 +126,10 @@ func TestPoller_Run_RetriesWithBackoffOnGetUpdatesError(t *testing.T) {
 	}
 
 	p := NewPoller(fc, 555, NewRouter())
+	originalBackoff := initialBackoff
+	t.Cleanup(func() {
+		initialBackoff = originalBackoff
+	})
 	initialBackoff = time.Millisecond // override package var for a fast test; see poller.go
 	p.Run(ctx)
 
