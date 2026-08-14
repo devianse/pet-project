@@ -14,6 +14,7 @@ type User struct {
 	AvatarColor  *string
 	PasswordHash string
 	Role         string
+	IsActive     bool
 	CreatedAt    time.Time
 	LastLoginAt  *time.Time
 }
@@ -49,14 +50,25 @@ func (s *Store) EnsureSchema(ctx context.Context) error {
 		ALTER TABLE users
 			ADD COLUMN IF NOT EXISTS avatar_color TEXT
 	`)
+	if err != nil {
+		return err
+	}
+	// Same post-release ADD COLUMN pattern as avatar_color above — an
+	// admin-triggered "deactivate" (blocks login, no data loss) needs
+	// somewhere to record it. Defaults true so every existing row reads
+	// as active with no backfill step.
+	_, err = s.conn.ExecContext(ctx, `
+		ALTER TABLE users
+			ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true
+	`)
 	return err
 }
 
-const selectUserColumns = `id, username, display_name, avatar_color, password_hash, role, created_at, last_login_at`
+const selectUserColumns = `id, username, display_name, avatar_color, password_hash, role, is_active, created_at, last_login_at`
 
 func scanUser(row *sql.Row) (*User, error) {
 	var u User
-	err := row.Scan(&u.ID, &u.Username, &u.DisplayName, &u.AvatarColor, &u.PasswordHash, &u.Role, &u.CreatedAt, &u.LastLoginAt)
+	err := row.Scan(&u.ID, &u.Username, &u.DisplayName, &u.AvatarColor, &u.PasswordHash, &u.Role, &u.IsActive, &u.CreatedAt, &u.LastLoginAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -89,7 +101,7 @@ func (s *Store) ListUsers(ctx context.Context) ([]*User, error) {
 	var users []*User
 	for rows.Next() {
 		var u User
-		if err := rows.Scan(&u.ID, &u.Username, &u.DisplayName, &u.AvatarColor, &u.PasswordHash, &u.Role, &u.CreatedAt, &u.LastLoginAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.DisplayName, &u.AvatarColor, &u.PasswordHash, &u.Role, &u.IsActive, &u.CreatedAt, &u.LastLoginAt); err != nil {
 			return nil, err
 		}
 		users = append(users, &u)
@@ -132,6 +144,45 @@ func (s *Store) UpdateRole(ctx context.Context, id int64, role string) (*User, e
 		UPDATE users SET role = $1
 		WHERE id = $2
 		RETURNING `+selectUserColumns, role, id)
+	user, err := scanUser(row)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, errors.New("update returned no row")
+	}
+	return user, nil
+}
+
+// SetActive sets a user's is_active flag. A false value blocks future
+// logins (checked in Handler.Login) without touching any other row —
+// the deliberately chosen alternative to a hard delete (see
+// planning/decisions.md). Callers (access.AdminHandler) are responsible
+// for the self-deactivate guard, same division of labor as UpdateRole.
+func (s *Store) SetActive(ctx context.Context, id int64, isActive bool) (*User, error) {
+	row := s.conn.QueryRowContext(ctx, `
+		UPDATE users SET is_active = $1
+		WHERE id = $2
+		RETURNING `+selectUserColumns, isActive, id)
+	user, err := scanUser(row)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, errors.New("update returned no row")
+	}
+	return user, nil
+}
+
+// SetPasswordHash overwrites a user's password_hash — the store side of
+// an admin-triggered password reset. Callers are responsible for hashing
+// the new password (auth.HashPassword) before calling, same as
+// CreateUser already expects a pre-hashed value.
+func (s *Store) SetPasswordHash(ctx context.Context, id int64, passwordHash string) (*User, error) {
+	row := s.conn.QueryRowContext(ctx, `
+		UPDATE users SET password_hash = $1
+		WHERE id = $2
+		RETURNING `+selectUserColumns, passwordHash, id)
 	user, err := scanUser(row)
 	if err != nil {
 		return nil, err

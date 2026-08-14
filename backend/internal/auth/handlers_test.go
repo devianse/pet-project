@@ -89,6 +89,36 @@ func TestHandler_Login_WrongPassword(t *testing.T) {
 	}
 }
 
+func TestHandler_Login_DeactivatedUserRejected(t *testing.T) {
+	handler, store, _ := newTestHandler(t)
+	ctx := context.Background()
+
+	hash, err := HashPassword("s3cret-pass")
+	if err != nil {
+		t.Fatalf("HashPassword: %v", err)
+	}
+	created, err := store.CreateUser(ctx, "mike", hash, "admin")
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	if _, err := store.SetActive(ctx, created.ID, false); err != nil {
+		t.Fatalf("SetActive: %v", err)
+	}
+
+	body, _ := json.Marshal(loginRequest{Username: "mike", Password: "s3cret-pass"})
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.Login(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for a deactivated user, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if len(rec.Result().Cookies()) != 0 {
+		t.Fatalf("expected no auth_token cookie for a rejected login, got %+v", rec.Result().Cookies())
+	}
+}
+
 func TestHandler_Login_UnknownUsername(t *testing.T) {
 	handler, _, _ := newTestHandler(t)
 

@@ -139,9 +139,12 @@ func main() {
 	mux.Handle("POST /api/datenight/proposals/{id}/decline", requireAuth(requireFeature("date-night")(http.HandlerFunc(datenightHandler.DeclineProposal))))
 
 	mux.Handle("GET /api/admin/users", requireAdmin(http.HandlerFunc(adminHandler.ListUsers)))
+	mux.Handle("POST /api/admin/users", requireAdmin(http.HandlerFunc(adminHandler.CreateUser)))
 	mux.Handle("POST /api/admin/users/{id}/features/{key}", requireAdmin(http.HandlerFunc(adminHandler.GrantFeature)))
 	mux.Handle("DELETE /api/admin/users/{id}/features/{key}", requireAdmin(http.HandlerFunc(adminHandler.RevokeFeature)))
 	mux.Handle("PUT /api/admin/users/{id}/role", requireAdmin(http.HandlerFunc(adminHandler.UpdateRole)))
+	mux.Handle("PUT /api/admin/users/{id}/active", requireAdmin(http.HandlerFunc(adminHandler.SetActive)))
+	mux.Handle("POST /api/admin/users/{id}/reset-password", requireAdmin(http.HandlerFunc(adminHandler.ResetPassword)))
 
 	port := os.Getenv("PORT")
 	if port == "" {

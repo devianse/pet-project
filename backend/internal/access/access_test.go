@@ -13,7 +13,8 @@ import (
 // setupAccessStore returns a ready *Store plus the auth.Store sharing the
 // same connection, so tests can create real users to grant features to.
 // Fixture usernames used by this file: access-mike, access-nastya,
-// access-admin — distinct from every other package's fixtures so
+// access-admin, access-mw, access-newbie — distinct from every other
+// package's fixtures so
 // `go test ./...`'s concurrent packages never collide on the shared
 // users table.
 func setupAccessStore(t *testing.T) (*Store, *auth.Store) {
@@ -38,7 +39,7 @@ func setupAccessStore(t *testing.T) (*Store, *auth.Store) {
 		t.Fatalf("ensuring access schema: %v", err)
 	}
 
-	usernames := []string{"access-mike", "access-nastya", "access-admin", "access-mw"}
+	usernames := []string{"access-mike", "access-nastya", "access-admin", "access-mw", "access-newbie"}
 	t.Cleanup(func() {
 		for _, u := range usernames {
 			conn.Exec(`DELETE FROM feature_access WHERE user_id IN (SELECT id FROM users WHERE username = $1)`, u)

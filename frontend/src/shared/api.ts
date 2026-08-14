@@ -326,6 +326,7 @@ export type AdminUser = {
   username: string
   display_name: string | null
   role: 'admin' | 'user'
+  is_active: boolean
   features: FeatureKey[]
   created_at: string
 }
@@ -363,5 +364,44 @@ export async function updateUserRole(userId: number, role: 'admin' | 'user'): Pr
   })
   if (!res.ok) {
     throw new Error(`failed to update role: ${res.status}`)
+  }
+}
+
+export async function createUser(
+  username: string,
+  password: string,
+  role: 'admin' | 'user',
+): Promise<AdminUser> {
+  const res = await request('/api/admin/users', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password, role }),
+  })
+  if (!res.ok) {
+    if (res.status === 409) throw new Error('username already exists')
+    throw new Error(`failed to create user: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function setUserActive(userId: number, isActive: boolean): Promise<void> {
+  const res = await request(`/api/admin/users/${userId}/active`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ is_active: isActive }),
+  })
+  if (!res.ok) {
+    throw new Error(`failed to update active state: ${res.status}`)
+  }
+}
+
+export async function resetUserPassword(userId: number, password: string): Promise<void> {
+  const res = await request(`/api/admin/users/${userId}/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }),
+  })
+  if (!res.ok) {
+    throw new Error(`failed to reset password: ${res.status}`)
   }
 }
