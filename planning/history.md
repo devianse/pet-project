@@ -286,3 +286,52 @@ matches `PLANNING.md`'s shell-first order one-for-one — see that file's
     (`SetMaxOpenConns`/`SetMaxIdleConns`/`SetConnMaxLifetime`) — flagged
     by the same audit but judged low-value at this app's current
     traffic (a handful of invited users), not worth bundling in here.
+16. **Telegram bot: `/help` + native command menu, dev+prod deployment**
+    (done, merged to `main` via PR #19 "telegram help menus") — a
+    follow-up to step 14's v1. `Router.Handle` gained a `description`
+    parameter stored alongside each prefix; `Router.Commands()` and
+    `Router.HelpText()` read that list back, so the in-chat `/help`
+    reply is generated from whatever's actually registered rather than
+    hand-maintained. `unknownCommandReply` now points users at `/help`.
+    `Client.SetMyCommands` wraps Telegram's `setMyCommands` endpoint
+    (stripping the leading `/` and any trailing arg-placeholder space
+    from each prefix) and is called once at startup from
+    `startTelegramBot`, right after registering `/notes`, `/newnote`,
+    and `/help` — this populates Telegram's native command-menu button
+    (the "/" icon next to the message box) with the same descriptions,
+    best-effort (logged, not fatal, if it fails).
+
+    Deployment: dev bot created via `@BotFather` and verified
+    end-to-end locally first (`/notes`/`/newnote`/`/help`, confirmed
+    via the local `make dev-backend` process). Then, per the two-bot
+    decision (`decisions.md`), a separate prod bot was created and its
+    token plus the (unchanged) chat ID added to `infra/.env` on the
+    VPS; `docker compose up -d` picked up the new env values without a
+    rebuild (no code changed on the VPS side, `infra/.env` already had
+    both vars wired into `docker-compose.yml` from step 14). Verified
+    live against the prod bot the same way as dev.
+17. **Home page redesign** (done, not yet committed) — replaced the
+    Phase 1 wiring-check stub (title + raw backend-health text, now
+    that Admin's Ops section owns health) with a combinatoric,
+    mobile-first cover page. Bounded-path work (brainstormed, short
+    in-chat design approved, no spec doc). `frontend/src/features/home/`
+    picks four slots independently at random on every mount — persona
+    (`personas.ts`: corporate-SaaS, glitch/error, Geocities '99,
+    guilt-trip visitor counter, pirate, noir detective, hype announcer,
+    fortune cookie, plus a wholesome control case), gimmick
+    (`Gimmick.tsx`: do-not-click button, absurd cookie-consent trio,
+    fake terminal, avatar-poke, magic 8-ball, rate-my-vibe, stuck-at-99%
+    loading bar), avatar entrance (`entrances.ts`: 8 framer-motion
+    choreographies), and background accent (`Accent.tsx`: confetti,
+    gradient blob, scanlines, sparkles, bubbles, pulsing grid, calm) —
+    3,528 total combinations, re-rolled fresh on every visit. All
+    motion respects `useReducedMotion()` (matching the existing
+    `pouf/disclosure.tsx` convention), stays transform/opacity-only for
+    phone performance, and touch-adapts the one hover-dependent bit
+    (the dodging "Close" button jumps on tap instead). New `home-*`
+    keyframes live in `index.css` since vendored `pouf.css` is
+    off-limits for hand edits. `tsc -b`, `oxlint`, and `vite build` all
+    ran clean; no frontend test framework exists in this repo yet, so
+    verification was build/typecheck plus a manual look at the running
+    dev server rather than an automated or browser-driven check (no
+    browser automation tool was available in this session).

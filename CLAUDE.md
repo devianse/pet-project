@@ -49,10 +49,12 @@ terminals simultaneously, which README explains in detail.
 - **A PR isn't ready unless `npm audit` (frontend), `govulncheck ./...`
   (backend), and `gitleaks detect --source . -v` all pass clean.** No CI
   enforces this yet — the `closing-out-a-feature` skill runs these
-  automatically (plus planning-doc updates and dev-resource cleanup)
-  once a feature branch is done, before the merge/PR decision. See
-  README's "Other commands" for install/usage of each if running by
-  hand.
+  automatically, then pushes the branch, opens the PR, and updates
+  planning docs in their final already-shipped state (citing the real
+  PR number) before handing off to `finishing-a-development-branch` for
+  the squash-merge/keep decision — see that skill's own doc for why the
+  PR is opened first. See README's "Other commands" for install/usage
+  of each if running by hand.
 - **Env vars**: each app has a `.env.example` (checked in) and `.env`
   (gitignored, real values) — see README's "Env config" section for the
   actual var list. Backend loads its via `godotenv`; frontend's

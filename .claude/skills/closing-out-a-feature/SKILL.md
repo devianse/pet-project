@@ -1,6 +1,6 @@
 ---
 name: closing-out-a-feature
-description: Use when implementation on a feature branch in this repo is complete and tests pass, before deciding how to integrate — verifies security/tests, checks for env/dependency/schema drift, updates planning docs, and kills any dev servers or ad hoc docker resources this session started. Runs before finishing-a-development-branch, which still owns the merge/PR/keep decision.
+description: Use when implementation on a feature branch in this repo is complete and tests pass, before deciding how to integrate — verifies security/tests, checks for env/dependency/schema drift, pushes the branch and opens the PR, updates planning docs in their final already-shipped state citing the real PR number, and kills any dev servers or ad hoc docker resources this session started. Runs before finishing-a-development-branch, which owns the squash-merge/keep decision — by the time it runs, the PR already exists.
 ---
 
 # Closing Out a Feature
@@ -13,8 +13,10 @@ docs (`planning/history.md`, `PLANNING.md`, `infra/deployment-runbook/`,
 what shipped, and
 subagent-driven development tends to leave dev servers and ad hoc docker
 containers running. This skill closes both gaps before handing off to
-`finishing-a-development-branch` for the actual merge/PR/keep decision —
-it does not replace that skill, it runs immediately before it.
+`finishing-a-development-branch` for the squash-merge/keep decision — it
+does not replace that skill, it runs immediately before it, and by then
+the branch is already pushed with an open PR (Step 3) so the docs in
+Step 4 can cite something real instead of a placeholder.
 
 **Announce at start:** "I'm using the closing-out-a-feature skill before
 we decide how to integrate this."
@@ -53,11 +55,52 @@ Diff the feature branch against its base branch and check for:
 Report findings plainly; nothing here blocks progress, it just feeds
 Step 3.
 
-## Step 3: Update Planning Docs
+## Step 3: Push and Open the PR
+
+This repo's convention: push the branch, open a GitHub PR, and
+squash-merge from the GitHub UI once ready — no local merge commit (see
+`finishing-a-development-branch`'s Quick Reference: only its "push and
+create PR" option fits this workflow; its "merge locally" option
+produces a real merge commit and should not be used here). Do this now,
+before drafting docs, so Step 4 can cite a real PR number instead of a
+placeholder or "pending" language:
+
+```bash
+git push -u origin <branch>
+gh pr create --fill   # or with an explicit title/body if --fill doesn't fit
+```
+
+Capture the PR number from the output — Step 4 needs it. If a PR
+already exists for this branch (e.g. re-running this skill after review
+feedback added another commit), skip creation, just push, and reuse the
+existing number.
+
+## Step 4: Update Planning Docs
 
 For each doc below, decide relevance, draft the update, show the draft,
 and only write it after approval — these are narrative/judgment calls,
-not mechanical edits:
+not mechanical edits.
+
+**Write every doc in its final, already-shipped state — never a
+"pending"/"not yet merged" hedge.** This branch's docs commit rides
+inside the PR and lands on `main` verbatim when it's squash-merged, so
+by the time anyone reads it there it *will* be true. Treating "PR open,
+ready to merge" as done — rather than waiting for the literal
+git-merge event — means:
+
+- A `decisions.md` item this branch resolves moves straight out of
+  "Still open" into the strikethrough/resolved list at the top,
+  referencing the new `history.md` entry, instead of being left
+  half-migrated for a later session to finish.
+- The new `history.md` entry is written in the same finished,
+  past-tense style as every other entry, citing the real PR number
+  from Step 3 (e.g. "merged to `main` via PR #19") — not a placeholder
+  or "will merge via."
+
+The one case this doesn't cover: a PR that doesn't land as opened
+(abandoned, substantially reworked in review). That's rare enough on a
+solo-reviewed project not to design the common path around — if it
+happens, fix the affected docs by hand then, as a one-off.
 
 - **`planning/history.md`** — always: append the next numbered entry,
   matching the existing style (what shipped, why, backend/frontend
@@ -80,7 +123,7 @@ not mechanical edits:
 Skip a doc outright rather than drafting a no-op update — say which
 ones you're skipping and why in one line each.
 
-## Step 4: Clean Up Dev Resources
+## Step 5: Clean Up Dev Resources
 
 Scope is **this session only** — don't go hunting for things older
 sessions may have left running; that's a separate concern.
@@ -98,7 +141,10 @@ sessions may have left running; that's a separate concern.
 If something is running and you're not sure whether this session
 started it or it predates this work, ask rather than killing it.
 
-## Step 5: Hand Off
+## Step 6: Hand Off
 
-Once Steps 1-4 are done, invoke `finishing-a-development-branch` for
-the merge/PR/keep decision. Don't make that call here.
+Once Steps 1-5 are done, invoke `finishing-a-development-branch` for
+the squash-merge/keep decision. The branch is already pushed with an
+open PR from Step 3 — when that skill's menu comes up, its "push and
+create PR" option is already satisfied; report the existing PR link
+instead of pushing/creating again. Don't make the merge/keep call here.

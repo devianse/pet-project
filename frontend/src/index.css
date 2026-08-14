@@ -8,3 +8,78 @@
 .user-menu-popover {
   padding-top: var(--s4);
 }
+
+/* Home page (features/home) — combinatoric cover-page flourishes. Scoped
+ * classes rather than pouf.css edits since that file is vendored/CLI-managed. */
+
+@keyframes home-wiggle {
+  0%, 100% { transform: rotate(-1.5deg); }
+  50% { transform: rotate(1.5deg); }
+}
+.home-wiggle {
+  animation: home-wiggle 2.4s ease-in-out infinite;
+}
+
+@keyframes home-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-6px); }
+  80% { transform: translateX(6px); }
+}
+.home-shake {
+  animation: home-shake 0.4s ease-in-out;
+}
+
+.home-comic-sans,
+.home-comic-sans * {
+  font-family: 'Comic Sans MS', 'Comic Sans', cursive !important;
+}
+
+@keyframes home-blob-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+.home-blob {
+  background: linear-gradient(120deg, var(--pink), var(--purple), var(--blue), var(--mint));
+  background-size: 300% 300%;
+  opacity: 0.25;
+  animation: home-blob-shift 8s ease-in-out infinite;
+}
+
+@keyframes home-scanlines-drift {
+  0% { background-position-y: 0; }
+  100% { background-position-y: 40px; }
+}
+.home-scanlines {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.06) 0px,
+    rgba(0, 0, 0, 0.06) 1px,
+    transparent 1px,
+    transparent 4px
+  );
+  animation: home-scanlines-drift 3s linear infinite;
+}
+
+@keyframes home-grid-pulse {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.35; }
+}
+.home-grid {
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.08) 1px, transparent 1px);
+  background-size: 32px 32px;
+  animation: home-grid-pulse 3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-wiggle,
+  .home-shake,
+  .home-blob,
+  .home-scanlines,
+  .home-grid {
+    animation: none;
+  }
+}

@@ -26,6 +26,8 @@ second copy.
   `history.md` step 12.
 - ~~Admin panel expansion, audit trail + ops/system panel~~ — see
   `history.md` step 13. Two follow-ups deferred, see "Still open" below.
+- ~~Telegram bot dev+prod deployment (two-bot setup, `/help` command +
+  native command menu)~~ — see `history.md` step 16.
 
 ## Still open
 
@@ -65,8 +67,9 @@ second copy.
   "Platform shell" section), needed before Shopping List's live-sync
   core loop or Date Night's deferred live-update follow-up can land.
 - **Telegram bot integration** — v1 (commands-in only: `/notes`,
-  `/newnote`) built on the `telegram` branch, not yet merged; see
-  `planning/history.md` entry 14. Design/spec:
+  `/newnote`, `/help`) deployed to both dev and prod, two separate
+  `@BotFather` bots per the routing constraint below; see
+  `planning/history.md` entries 14 and 16. Design/spec:
   `docs/superpowers/specs/2026-08-14-telegram-bot-design.md`. Another
   cross-cutting platform capability like WebSockets (see `PLANNING.md`'s
   "Platform shell" section) — two-way (commands in, notifications out)
@@ -76,20 +79,29 @@ second copy.
   gap; a later financial-subscription tracker's renewal-due
   notifications) is still not started — v1 shipped commands-in only.
 
-  **Deployment setup, decided but not yet done (2026-08-14)**: dev and
-  prod need **two separate bots** (two `@BotFather`-issued tokens), not
-  one bot shared across both. `Poller`'s `GetUpdates` long-poll only
-  allows one active consumer per bot token — two envs polling the same
-  token race and get `409 Conflict`ed against each other, and there's
-  no way to route "this update is for dev vs. prod" anyway (`chat_id`
-  identifies the Telegram *account* messaging the bot — same value
-  across all devices/clients of that account and across every bot it
-  DMs — not which backend should handle it). So: `TELEGRAM_CHAT_ID`
-  stays identical in `backend/.env` and `infra/.env` (still your own
-  account either way); `TELEGRAM_BOT_TOKEN` differs (one bot for dev,
-  one for prod). Next step: set up the **dev** bot/token first, verify
-  `/notes`/`/newnote` end-to-end locally, before touching `infra/.env`
-  for prod.
+  **Two bots, one chat ID** (decided 2026-08-14): dev and prod need
+  **two separate bots** (two `@BotFather`-issued tokens), not one bot
+  shared across both. `Poller`'s `GetUpdates` long-poll only allows one
+  active consumer per bot token — two envs polling the same token race
+  and get `409 Conflict`ed against each other, and there's no way to
+  route "this update is for dev vs. prod" anyway (`chat_id` identifies
+  the Telegram *account* messaging the bot — same value across all
+  devices/clients of that account and across every bot it DMs — not
+  which backend should handle it). So: `TELEGRAM_CHAT_ID` stays
+  identical in `backend/.env` and `infra/.env` (still your own account
+  either way); `TELEGRAM_BOT_TOKEN` differs (one bot for dev, one for
+  prod).
+- **Redeploy's `GIT_SHA` export is manual, TODO to fix later** — every
+  redeploy (`infra/deployment-runbook/03-redeploy.md`) requires
+  running `export GIT_SHA=$(git -C .. rev-parse --short HEAD)` by hand
+  before `docker compose up -d --build`, so `/api/health`'s `version`
+  field reflects what's actually running. Easy to forget (stale
+  `version` silently lingers, nothing fails loudly), cumbersome to
+  redo every time by hand. No design yet — worth automating (e.g. a
+  Makefile/script wrapper around the redeploy `docker compose`
+  invocation, or reading the sha from inside the image at build time
+  instead of an externally-exported env var) when it's next annoying
+  enough to fix.
 - **OpenTelemetry** — not started, no design yet. Requested want:
   observability (traces/metrics/logs) across the backend, presumably the
   reverse proxy too. Open questions to resolve before this is buildable:
