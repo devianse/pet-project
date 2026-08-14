@@ -181,3 +181,39 @@ func TestStore_UpdateProfile(t *testing.T) {
 		t.Fatalf("expected both fields cleared, got %+v", cleared)
 	}
 }
+
+func TestStore_ListUsers(t *testing.T) {
+	store, _ := setupStore(t)
+	ctx := context.Background()
+
+	hash, err := HashPassword("s3cret-pass")
+	if err != nil {
+		t.Fatalf("HashPassword: %v", err)
+	}
+	if _, err := store.CreateUser(ctx, "bob", hash, "user"); err != nil {
+		t.Fatalf("CreateUser bob: %v", err)
+	}
+	if _, err := store.CreateUser(ctx, "alice", hash, "admin"); err != nil {
+		t.Fatalf("CreateUser alice: %v", err)
+	}
+
+	users, err := store.ListUsers(ctx)
+	if err != nil {
+		t.Fatalf("ListUsers: %v", err)
+	}
+
+	var found []string
+	for _, u := range users {
+		if u.Username == "bob" || u.Username == "alice" {
+			found = append(found, u.Username)
+		}
+	}
+	if len(found) != 2 {
+		t.Fatalf("expected bob and alice in the list, got %v", found)
+	}
+	// ORDER BY username puts alice before bob among these two, regardless
+	// of what other fixture rows other tests may have left around.
+	if found[0] != "alice" || found[1] != "bob" {
+		t.Fatalf("expected alphabetical order [alice bob], got %v", found)
+	}
+}

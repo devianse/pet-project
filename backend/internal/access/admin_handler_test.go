@@ -1,0 +1,175 @@
+// backend/internal/access/admin_handler_test.go
+package access
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
+	"testing"
+)
+
+func TestAdminHandler_ListUsers_ReturnsActualGrantsNotBypass(t *testing.T) {
+	accessStore, authStore := setupAccessStore(t)
+	ctx := context.Background()
+	userID := createTestUser(t, authStore, "access-mike", "user")
+	adminID := createTestUser(t, authStore, "access-admin", "admin")
+
+	if err := accessStore.Grant(ctx, userID, "notes"); err != nil {
+		t.Fatalf("Grant: %v", err)
+	}
+
+	handler := NewAdminHandler(accessStore, authStore)
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/users", nil)
+	rec := httptest.NewRecorder()
+	handler.ListUsers(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp []adminUserResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decoding response: %v", err)
+	}
+
+	var mike, admin *adminUserResponse
+	for i := range resp {
+		switch resp[i].ID {
+		case userID:
+			mike = &resp[i]
+		case adminID:
+			admin = &resp[i]
+		}
+	}
+	if mike == nil || admin == nil {
+		t.Fatalf("expected both fixture users in the response, got %+v", resp)
+	}
+	if len(mike.Features) != 1 || mike.Features[0] != "notes" {
+		t.Fatalf("expected access-mike to show [notes], got %v", mike.Features)
+	}
+	// Admin's real feature_access rows are empty — this endpoint must use
+	// ListForUser (actual grants), not ListAllForUser (bypass-inflated).
+	if len(admin.Features) != 0 {
+		t.Fatalf("expected admin's actual grants to be empty (no bypass inflation), got %v", admin.Features)
+	}
+}
+
+func TestAdminHandler_GrantFeature_ThenListForUserShowsIt(t *testing.T) {
+	accessStore, authStore := setupAccessStore(t)
+	ctx := context.Background()
+	userID := createTestUser(t, authStore, "access-mike", "user")
+
+	handler := NewAdminHandler(accessStore, authStore)
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/users/"+strconv.FormatInt(userID, 10)+"/features/notes", nil)
+	req.SetPathValue("id", strconv.FormatInt(userID, 10))
+	req.SetPathValue("key", "notes")
+	rec := httptest.NewRecorder()
+	handler.GrantFeature(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	features, err := accessStore.ListForUser(ctx, userID)
+	if err != nil {
+		t.Fatalf("ListForUser: %v", err)
+	}
+	if len(features) != 1 || features[0] != "notes" {
+		t.Fatalf("expected [notes] after grant, got %v", features)
+	}
+}
+
+func TestAdminHandler_GrantFeature_UnknownKeyRejected(t *testing.T) {
+	accessStore, authStore := setupAccessStore(t)
+	userID := createTestUser(t, authStore, "access-mike", "user")
+
+	handler := NewAdminHandler(accessStore, authStore)
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/users/"+strconv.FormatInt(userID, 10)+"/features/bogus", nil)
+	req.SetPathValue("id", strconv.FormatInt(userID, 10))
+	req.SetPathValue("key", "bogus")
+	rec := httptest.NewRecorder()
+	handler.GrantFeature(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for unknown feature key, got %d", rec.Code)
+	}
+}
+
+func TestAdminHandler_RevokeFeature_RemovesGrant(t *testing.T) {
+	accessStore, authStore := setupAccessStore(t)
+	ctx := context.Background()
+	userID := createTestUser(t, authStore, "access-mike", "user")
+	if err := accessStore.Grant(ctx, userID, "notes"); err != nil {
+		t.Fatalf("Grant: %v", err)
+	}
+
+	handler := NewAdminHandler(accessStore, authStore)
+	req := httptest.NewRequest(http.MethodDelete, "/api/admin/users/"+strconv.FormatInt(userID, 10)+"/features/notes", nil)
+	req.SetPathValue("id", strconv.FormatInt(userID, 10))
+	req.SetPathValue("key", "notes")
+	rec := httptest.NewRecorder()
+	handler.RevokeFeature(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	features, err := accessStore.ListForUser(ctx, userID)
+	if err != nil {
+		t.Fatalf("ListForUser: %v", err)
+	}
+	if len(features) != 0 {
+		t.Fatalf("expected no features after revoke, got %v", features)
+	}
+}
+
+func TestAdminHandler_RevokeFeature_NothingToRevokeIsStillNoContent(t *testing.T) {
+	accessStore, authStore := setupAccessStore(t)
+	userID := createTestUser(t, authStore, "access-mike", "user")
+
+	handler := NewAdminHandler(accessStore, authStore)
+	req := httptest.NewRequest(http.MethodDelete, "/api/admin/users/"+strconv.FormatInt(userID, 10)+"/features/notes", nil)
+	req.SetPathValue("id", strconv.FormatInt(userID, 10))
+	req.SetPathValue("key", "notes")
+	rec := httptest.NewRecorder()
+	handler.RevokeFeature(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204 even with nothing to revoke, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestAdminHandler_GrantFeature_InvalidIDRejected(t *testing.T) {
+	accessStore, authStore := setupAccessStore(t)
+	handler := NewAdminHandler(accessStore, authStore)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/users/not-a-number/features/notes", nil)
+	req.SetPathValue("id", "not-a-number")
+	req.SetPathValue("key", "notes")
+	rec := httptest.NewRecorder()
+	handler.GrantFeature(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for a non-numeric id, got %d", rec.Code)
+	}
+}
+
+func TestAdminHandler_GrantFeature_UnknownUserIDRejected(t *testing.T) {
+	accessStore, authStore := setupAccessStore(t)
+	handler := NewAdminHandler(accessStore, authStore)
+
+	// A numeric id that parses fine but matches no row — distinct from
+	// the malformed-id case above, and from Grant's own FK constraint
+	// (which would otherwise surface as a generic 500, not a clean 404).
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/users/999999999/features/notes", nil)
+	req.SetPathValue("id", "999999999")
+	req.SetPathValue("key", "notes")
+	rec := httptest.NewRecorder()
+	handler.GrantFeature(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for an unknown user id, got %d: %s", rec.Code, rec.Body.String())
+	}
+}

@@ -38,6 +38,26 @@ export async function getHealth(): Promise<{ status: string }> {
 // language boundary.
 export type FeatureKey = 'notes' | 'watchlist' | 'date-night' | 'shopping-list' | 'image-processing'
 
+// Feature key -> human label, hand-kept in sync with
+// backend/internal/access/features.go's KnownFeatures — same duplication
+// FeatureKey itself already has across the language boundary. Declared as
+// a Record so TypeScript enforces every FeatureKey has a label — adding a
+// key to the union without adding it here is now a compile error, rather
+// than the admin matrix silently rendering one column short.
+const FEATURE_LABELS: Record<FeatureKey, string> = {
+  notes: 'Notes',
+  watchlist: 'Watchlist',
+  'date-night': 'Date Night',
+  'shopping-list': 'Shopping List',
+  'image-processing': 'Image Processing',
+}
+
+// Feature key + human label pairs, derived from FEATURE_LABELS. Used by
+// the admin grants matrix to render one labeled column per feature.
+export const KNOWN_FEATURES: { key: FeatureKey; label: string }[] = Object.entries(
+  FEATURE_LABELS,
+).map(([key, label]) => ({ key: key as FeatureKey, label }))
+
 // Kept in sync with backend/internal/auth/handlers.go's allowedAvatarColors
 // — the six pouf "brand" tones meant for user-facing color choices (not
 // the semantic up/down/warn/info/idle tones reserved for status).
@@ -299,4 +319,38 @@ export async function declineDateNightProposal(id: number): Promise<DateNightPro
   const res = await request(`/api/datenight/proposals/${id}/decline`, { method: 'POST' })
   if (!res.ok) throw new Error(`failed to decline proposal: ${res.status}`)
   return res.json()
+}
+
+export type AdminUser = {
+  id: number
+  username: string
+  display_name: string | null
+  role: 'admin' | 'user'
+  features: FeatureKey[]
+  created_at: string
+}
+
+// GET /api/admin/users returns each user's actual feature_access rows
+// (not the admin bypass's inflated view) — see
+// backend/internal/access/admin_handler.go's ListUsers doc comment.
+export async function getAdminUsers(): Promise<AdminUser[]> {
+  const res = await request('/api/admin/users')
+  if (!res.ok) {
+    throw new Error(`failed to load users: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function grantFeature(userId: number, key: FeatureKey): Promise<void> {
+  const res = await request(`/api/admin/users/${userId}/features/${key}`, { method: 'POST' })
+  if (!res.ok) {
+    throw new Error(`failed to grant ${key}: ${res.status}`)
+  }
+}
+
+export async function revokeFeature(userId: number, key: FeatureKey): Promise<void> {
+  const res = await request(`/api/admin/users/${userId}/features/${key}`, { method: 'DELETE' })
+  if (!res.ok) {
+    throw new Error(`failed to revoke ${key}: ${res.status}`)
+  }
 }
