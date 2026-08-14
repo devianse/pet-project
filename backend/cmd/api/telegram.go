@@ -41,6 +41,16 @@ func startTelegramBot(logger *slog.Logger, notesStore *notes.Store) {
 	logger.Info("telegram bot poller started")
 }
 
+// maxReplyChars caps how long a /notes reply is allowed to get, well under
+// Telegram's ~4096-char sendMessage limit. Notes have no LIMIT applied by
+// notes.Store.List and individual notes can be up to 10000 chars via the
+// HTTP API, so an unbounded join can exceed Telegram's cap — sendMessage
+// then returns ok:false, which the poller only logs and swallows, so the
+// user would get no reply at all with no visible sign anything went
+// wrong. Truncating to whole lines under this budget keeps replies always
+// deliverable.
+const maxReplyChars = 3900
+
 // notesListCommand replies with every note's content, one per line (most
 // recent first, same order GET /api/notes returns), or a placeholder if
 // there are none. Reuses notes.Store.List — the same read path the HTTP
@@ -59,8 +69,39 @@ func notesListCommand(store *notes.Store) telegram.CommandFunc {
 		for i, n := range all {
 			lines[i] = fmt.Sprintf("- %s", n.Content)
 		}
-		return strings.Join(lines, "\n"), nil
+		return joinCapped(lines, maxReplyChars), nil
 	}
+}
+
+// joinCapped joins lines with "\n", but if the full join would exceed
+// maxChars, includes only as many whole leading lines as fit and appends
+// a trailing "... (N more)" line noting how many were left out — rather
+// than silently truncating mid-line or exceeding Telegram's message-length
+// cap and getting the whole reply dropped.
+func joinCapped(lines []string, maxChars int) string {
+	full := strings.Join(lines, "\n")
+	if len(full) <= maxChars {
+		return full
+	}
+
+	var kept []string
+	length := 0
+	for i, line := range lines {
+		// +1 accounts for the "\n" that would join this line to the
+		// previous one (not needed before the first line).
+		added := len(line)
+		if i > 0 {
+			added++
+		}
+		if length+added > maxChars {
+			break
+		}
+		kept = append(kept, line)
+		length += added
+	}
+
+	remaining := len(lines) - len(kept)
+	return strings.Join(kept, "\n") + fmt.Sprintf("\n... (%d more)", remaining)
 }
 
 // notesNewCommand creates one note from args and replies with confirmation.

@@ -9,8 +9,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -105,16 +108,51 @@ func (c *RealClient) GetUpdates(ctx context.Context, offset int64, timeoutSecond
 	if err != nil {
 		return nil, err
 	}
-	var updates []Update
-	if err := json.Unmarshal(result, &updates); err != nil {
+
+	// Decode the array one element at a time rather than in one
+	// json.Unmarshal call: if a single element fails to decode (a type
+	// mismatch on some field), decoding the whole array in one shot would
+	// fail the entire batch. Poller.Run would then retry with the same
+	// offset, refetching that same malformed element forever.
+	//
+	// So each element is decoded individually. If full decode fails, we
+	// still attempt a lightweight decode of just update_id (the one field
+	// unlikely to be the cause of a type mismatch on "some field") and
+	// return an Update carrying only that ID with a nil Message — Poller
+	// already treats a nil Message as a no-op, but still advances its
+	// offset past every update in the returned slice, so this is enough
+	// to stop the malformed element from being refetched forever without
+	// any change to poller.go. Only if even that minimal parse fails do
+	// we drop the element entirely (offset can't safely advance past an
+	// update whose ID is unknown).
+	var raw []json.RawMessage
+	if err := json.Unmarshal(result, &raw); err != nil {
 		return nil, fmt.Errorf("decoding telegram updates: %w", err)
+	}
+
+	updates := make([]Update, 0, len(raw))
+	for _, r := range raw {
+		var u Update
+		if err := json.Unmarshal(r, &u); err != nil {
+			var idOnly struct {
+				UpdateID int64 `json:"update_id"`
+			}
+			if idErr := json.Unmarshal(r, &idOnly); idErr != nil {
+				slog.Error("telegram: dropping unparseable update, offset cannot advance past it", "error", err, "raw", string(r))
+				continue
+			}
+			slog.Error("telegram: skipping malformed update", "error", err, "update_id", idOnly.UpdateID, "raw", string(r))
+			updates = append(updates, Update{UpdateID: idOnly.UpdateID})
+			continue
+		}
+		updates = append(updates, u)
 	}
 	return updates, nil
 }
 
 func (c *RealClient) post(ctx context.Context, path string, body []byte) (json.RawMessage, error) {
-	url := fmt.Sprintf("%s/bot%s%s", c.baseURL, c.token, path)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	reqURL := fmt.Sprintf("%s/bot%s%s", c.baseURL, c.token, path)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +160,15 @@ func (c *RealClient) post(ctx context.Context, path string, body []byte) (json.R
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		// *url.Error's Error() string embeds the full request URL, which
+		// contains the bot token — unwrap to the inner error so the
+		// token never reaches logs (this error flows straight into
+		// poller.go's slog.Error on every network blip).
+		var ue *url.Error
+		if errors.As(err, &ue) {
+			return nil, fmt.Errorf("calling telegram %s: %w", path, ue.Err)
+		}
+		return nil, fmt.Errorf("calling telegram %s: %w", path, err)
 	}
 	defer resp.Body.Close()
 

@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/devianse/pet-project/backend/internal/db"
@@ -63,6 +64,34 @@ func TestNotesListCommand_ListsExistingNotes(t *testing.T) {
 	}
 	if reply != "- walk dog\n- buy milk" {
 		t.Fatalf("unexpected reply: %q", reply)
+	}
+}
+
+func TestNotesListCommand_CapsReplyUnderTelegramLimitWithManyNotes(t *testing.T) {
+	store := setupNotesStore(t)
+
+	// 40 notes of 200 chars each join to ~8000+ chars, comfortably over
+	// maxReplyChars (3900) but with each individual line well under it —
+	// so truncation lands on a whole-line boundary rather than dropping
+	// everything, exercising the "keep as many whole lines as fit" path.
+	contents := make([]string, 40)
+	for i := range contents {
+		contents[i] = strings.Repeat("x", 200)
+	}
+	if _, err := store.InsertBatch(context.Background(), contents); err != nil {
+		t.Fatalf("seeding notes: %v", err)
+	}
+	cmd := notesListCommand(store)
+
+	reply, err := cmd(context.Background(), "")
+	if err != nil {
+		t.Fatalf("notesListCommand: %v", err)
+	}
+	if len(reply) >= 4096 {
+		t.Fatalf("expected reply under telegram's 4096-char cap, got %d chars", len(reply))
+	}
+	if !strings.Contains(reply, "more") {
+		t.Fatalf("expected truncated reply to mention there's more, got %q", reply)
 	}
 }
 

@@ -25,6 +25,8 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       ENV: production
       GIT_SHA: ${GIT_SHA}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
     depends_on:
       postgres:
         condition: service_healthy
