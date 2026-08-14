@@ -8,6 +8,7 @@ import (
 
 	"github.com/devianse/pet-project/backend/internal/db"
 	"github.com/devianse/pet-project/backend/internal/notes"
+	"github.com/devianse/pet-project/backend/internal/telegram"
 )
 
 // setupNotesStore mirrors notes/store_test.go's setupStore — same
@@ -104,5 +105,16 @@ func TestNotesNewCommand_EmptyArgsRepliesUsage(t *testing.T) {
 	}
 	if len(all) != 0 {
 		t.Fatalf("expected no note created for empty args, got %+v", all)
+	}
+}
+
+func TestNotesNewCommand_BareCommandViaRouter(t *testing.T) {
+	store := setupNotesStore(t)
+	router := telegram.NewRouter()
+	router.Handle("/newnote", notesNewCommand(store))
+
+	reply := router.Dispatch(context.Background(), "/newnote")
+	if reply != "usage: /newnote <text>" {
+		t.Fatalf("bare /newnote should return usage message, got %q", reply)
 	}
 }

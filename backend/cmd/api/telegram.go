@@ -33,7 +33,7 @@ func startTelegramBot(logger *slog.Logger, notesStore *notes.Store) {
 
 	router := telegram.NewRouter()
 	router.Handle("/notes", notesListCommand(notesStore))
-	router.Handle("/newnote ", notesNewCommand(notesStore))
+	router.Handle("/newnote", notesNewCommand(notesStore))
 
 	client := telegram.NewRealClient(token)
 	poller := telegram.NewPoller(client, chatID, router)
