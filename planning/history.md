@@ -211,3 +211,54 @@ matches `PLANNING.md`'s shell-first order one-for-one — see that file's
     pre-existing Go-toolchain stdlib vulnerabilities as step 12,
     confirmed present even with this branch's changes stashed out — not
     introduced here; no new dependency was added).
+14. **Telegram bot v1** (done, on the `telegram` branch, not yet merged)
+    — a commands-in Telegram bot for the app, implemented per
+    `docs/superpowers/specs/2026-08-14-telegram-bot-design.md` and
+    `docs/superpowers/plans/2026-08-14-telegram-bot-v1.md` via
+    subagent-driven development, no worktree (branch checked out
+    directly). New `backend/internal/telegram` package: a `Client`
+    (`SendMessage`/`GetUpdates` against the Telegram Bot API,
+    long-polling with a 30s timeout), a `Router` (prefix-matched
+    command dispatch, "unknown command" fallback), and a `Poller`
+    (offset-tracked polling loop with exponential backoff on transport
+    errors, run as a background goroutine mirroring the existing
+    `loginLimiter.startCleanup` pattern). `cmd/api` wires it up via
+    `startTelegramBot`, gated on `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID`
+    both being set (optional-start: the server runs normally with the
+    bot disabled if either is missing) and restricted to a single
+    allowed chat ID. Two commands ship: `/notes` (lists the notes
+    feature's entries, capped under Telegram's ~4096-char message limit
+    with a truncation trailer) and `/newnote <text>` (creates one). No
+    DB schema change — reuses the existing `internal/notes` store.
+
+    The final whole-branch review (most capable model) caught and fixed
+    one Critical and three Important issues before merge-readiness: a
+    transport-error path that leaked the bot token into logs via an
+    embedded request URL (fixed by unwrapping `*url.Error` before
+    logging); `infra/docker-compose.yml` never forwarding the two new
+    env vars into the container (the plan's "no compose changes"
+    constraint turned out to be a plan bug, not a real constraint —
+    ruled and fixed, since it left the feature permanently inert in
+    production); the `/notes` reply exceeding Telegram's message-length
+    cap with no visible error; and one malformed update in a batch
+    permanently wedging the poller (contradicted the spec's own "one
+    bad update doesn't block subsequent ones"). All four fixed in one
+    consolidated fix wave, re-reviewed clean.
+
+    Closing this branch out also surfaced and fixed a pre-existing,
+    unrelated test-isolation gap: bumping the Go toolchain
+    1.26.5→1.26.6 (clearing 6 stdlib CVEs `govulncheck` flagged, present
+    on `main` too) invalidated Go's test cache, which exposed that
+    several `internal/access` tests asserted `ListAuditLog`'s *global*
+    unfiltered count — never reliable against a shared local dev
+    Postgres that also backs real admin-panel usage — and that
+    `internal/auth`'s test cleanup could hit a foreign-key violation
+    deleting fixture users referenced by stale `admin_audit_log` rows.
+    Both fixed (scoped the audit-log assertions to their own test
+    actor; clear referencing audit rows before the user delete),
+    verified stable across repeated uncached full-suite runs.
+    `govulncheck`/`npm audit`/`gitleaks` all clean.
+
+    Task 5 of the plan (manual verification against the real Telegram
+    API) was explicitly not automated — needs a real bot token and a
+    real Telegram account, left for manual follow-up.

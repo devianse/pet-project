@@ -46,8 +46,9 @@ Still open:
   feature (available to any project plugged in later), not a dedicated
   page. Not started — see `planning/decisions.md`.
 - **Telegram bot integration** — same "cross-cutting capability, not a
-  page" relationship as WebSockets. Design approved and spec'd, not
-  built yet — see `planning/decisions.md`.
+  page" relationship as WebSockets. v1 (commands-in: `/notes`,
+  `/newnote`) built on the `telegram` branch, not yet merged — see
+  `planning/history.md` entry 14 and `planning/decisions.md`.
 
 Standing decisions (not "todo," deliberate choices not to build
 something — worth keeping since the absence isn't visible from the code
