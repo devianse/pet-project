@@ -15,13 +15,20 @@ const RouterLinkAdapter: LinkComponent = ({ href, children, ...rest }) => (
   </Link>
 )
 
-const NAV_ITEMS: { href: string; label: string; icon: IconName; feature?: FeatureKey }[] = [
+const NAV_ITEMS: {
+  href: string
+  label: string
+  icon: IconName
+  feature?: FeatureKey
+  adminOnly?: boolean
+}[] = [
   { href: '/', label: 'Home', icon: 'home' },
   { href: '/shopping-list', label: 'Shopping List', icon: 'cart', feature: 'shopping-list' },
   { href: '/image-processing', label: 'Image Processing', icon: 'photo', feature: 'image-processing' },
   { href: '/notes', label: 'Notes', icon: 'log', feature: 'notes' },
   { href: '/watchlist', label: 'Watchlist', icon: 'play', feature: 'watchlist' },
   { href: '/date-night', label: 'Date Night', icon: 'heart', feature: 'date-night' },
+  { href: '/admin', label: 'Admin', icon: 'settings', adminOnly: true },
 ]
 
 // Below `md` this reflows to a plain horizontal bar via Tailwind's
@@ -32,7 +39,11 @@ const NAV_ITEMS: { href: string; label: string; icon: IconName; feature?: Featur
 export function AppShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
   const { user } = useAuth()
-  const visibleNavItems = NAV_ITEMS.filter((item) => !item.feature || user?.features.includes(item.feature))
+  const visibleNavItems = NAV_ITEMS.filter(
+    (item) =>
+      (!item.feature || user?.features.includes(item.feature)) &&
+      (!item.adminOnly || user?.role === 'admin'),
+  )
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row bg-bg text-ink">
