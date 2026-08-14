@@ -54,6 +54,7 @@ func main() {
 		os.Exit(1)
 	}
 	notesHandler := notes.NewHandler(notesStore)
+	startTelegramBot(logger, notesStore)
 
 	tmdbToken := os.Getenv("TMDB_READ_ACCESS_TOKEN")
 	if tmdbToken == "" {

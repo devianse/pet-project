@@ -216,12 +216,18 @@ func TestLogActionAndListAuditLog(t *testing.T) {
 		t.Fatalf("LogAction: %v", err)
 	}
 
-	entries, err := store.ListAuditLog(ctx)
+	allEntries, err := store.ListAuditLog(ctx)
 	if err != nil {
 		t.Fatalf("ListAuditLog: %v", err)
 	}
+	// ListAuditLog is unfiltered across the whole table, which in a shared
+	// dev database also accumulates real admin-panel activity outside
+	// these tests. Scope to entries this test itself produced (by actor)
+	// rather than asserting a global count, so real activity elsewhere in
+	// admin_audit_log never breaks this assertion.
+	entries := filterByActor(allEntries, "access-admin")
 	if len(entries) != 1 {
-		t.Fatalf("expected 1 audit entry, got %d", len(entries))
+		t.Fatalf("expected 1 audit entry for access-admin, got %d", len(entries))
 	}
 	got := entries[0]
 	if got.ActorUsername != "access-admin" {
@@ -250,12 +256,15 @@ func TestLogAction_TargetUserOptional(t *testing.T) {
 		t.Fatalf("LogAction: %v", err)
 	}
 
-	entries, err := store.ListAuditLog(ctx)
+	allEntries, err := store.ListAuditLog(ctx)
 	if err != nil {
 		t.Fatalf("ListAuditLog: %v", err)
 	}
+	// See TestLogActionAndListAuditLog for why this scopes by actor
+	// instead of asserting a global count.
+	entries := filterByActor(allEntries, "access-admin")
 	if len(entries) != 1 {
-		t.Fatalf("expected 1 audit entry, got %d", len(entries))
+		t.Fatalf("expected 1 audit entry for access-admin, got %d", len(entries))
 	}
 	if entries[0].TargetUsername != nil {
 		t.Fatalf("expected nil target username, got %v", *entries[0].TargetUsername)
@@ -274,16 +283,37 @@ func TestListAuditLog_NewestFirst(t *testing.T) {
 		t.Fatalf("second LogAction: %v", err)
 	}
 
-	entries, err := store.ListAuditLog(ctx)
+	allEntries, err := store.ListAuditLog(ctx)
 	if err != nil {
 		t.Fatalf("ListAuditLog: %v", err)
 	}
+	// See TestLogActionAndListAuditLog for why this scopes by actor
+	// instead of asserting a global count. Ordering (newest-first) is
+	// preserved by filtering without re-sorting.
+	entries := filterByActor(allEntries, "access-admin")
 	if len(entries) != 2 {
-		t.Fatalf("expected 2 audit entries, got %d", len(entries))
+		t.Fatalf("expected 2 audit entries for access-admin, got %d", len(entries))
 	}
 	if entries[0].Action != "revoke_feature" || entries[1].Action != "grant_feature" {
 		t.Fatalf("expected newest-first order, got %v then %v", entries[0].Action, entries[1].Action)
 	}
+}
+
+// filterByActor scopes a ListAuditLog result to entries produced by a
+// specific actor username. ListAuditLog itself is intentionally
+// unfiltered (see access.go), which in a shared dev database also
+// surfaces real admin-panel activity outside any given test run — so
+// tests that assert exact counts scope down to their own fixture actor
+// first, keeping unrelated activity elsewhere in the table from ever
+// breaking these assertions.
+func filterByActor(entries []AuditEntry, actorUsername string) []AuditEntry {
+	scoped := make([]AuditEntry, 0, len(entries))
+	for _, e := range entries {
+		if e.ActorUsername == actorUsername {
+			scoped = append(scoped, e)
+		}
+	}
+	return scoped
 }
 
 // TestHasFeature_DemotedAdminLosesBypassImmediately guards the gap a stale

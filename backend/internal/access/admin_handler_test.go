@@ -521,12 +521,16 @@ func TestAdminHandler_GrantFeature_LogsAuditEntry(t *testing.T) {
 		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
 	}
 
-	entries, err := accessStore.ListAuditLog(ctx)
+	allEntries, err := accessStore.ListAuditLog(ctx)
 	if err != nil {
 		t.Fatalf("ListAuditLog: %v", err)
 	}
+	// ListAuditLog is unfiltered across the whole table; scope to this
+	// test's own actor so real admin-panel activity elsewhere in a
+	// shared dev database never breaks this assertion.
+	entries := filterByActor(allEntries, "access-admin")
 	if len(entries) != 1 {
-		t.Fatalf("expected 1 audit entry, got %d", len(entries))
+		t.Fatalf("expected 1 audit entry for access-admin, got %d", len(entries))
 	}
 	if entries[0].ActorUsername != "access-admin" || entries[0].Action != "grant_feature" {
 		t.Fatalf("unexpected audit entry: %+v", entries[0])
@@ -554,10 +558,11 @@ func TestAdminHandler_RevokeFeature_LogsAuditEntry(t *testing.T) {
 		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
 	}
 
-	entries, err := accessStore.ListAuditLog(ctx)
+	allEntries, err := accessStore.ListAuditLog(ctx)
 	if err != nil {
 		t.Fatalf("ListAuditLog: %v", err)
 	}
+	entries := filterByActor(allEntries, "access-admin")
 	if len(entries) != 1 || entries[0].Action != "revoke_feature" || entries[0].Detail != "feature=notes" {
 		t.Fatalf("unexpected audit entries: %+v", entries)
 	}
@@ -574,10 +579,11 @@ func TestAdminHandler_CreateUser_LogsAuditEntry(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 
-	entries, err := accessStore.ListAuditLog(ctx)
+	allEntries, err := accessStore.ListAuditLog(ctx)
 	if err != nil {
 		t.Fatalf("ListAuditLog: %v", err)
 	}
+	entries := filterByActor(allEntries, "access-admin")
 	if len(entries) != 1 || entries[0].Action != "create_user" {
 		t.Fatalf("unexpected audit entries: %+v", entries)
 	}
@@ -598,10 +604,11 @@ func TestAdminHandler_SetActive_LogsAuditEntry(t *testing.T) {
 		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
 	}
 
-	entries, err := accessStore.ListAuditLog(ctx)
+	allEntries, err := accessStore.ListAuditLog(ctx)
 	if err != nil {
 		t.Fatalf("ListAuditLog: %v", err)
 	}
+	entries := filterByActor(allEntries, "access-admin")
 	if len(entries) != 1 || entries[0].Action != "set_active" || entries[0].Detail != "is_active=false" {
 		t.Fatalf("unexpected audit entries: %+v", entries)
 	}
@@ -619,10 +626,11 @@ func TestAdminHandler_ResetPassword_LogsAuditEntry(t *testing.T) {
 		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
 	}
 
-	entries, err := accessStore.ListAuditLog(ctx)
+	allEntries, err := accessStore.ListAuditLog(ctx)
 	if err != nil {
 		t.Fatalf("ListAuditLog: %v", err)
 	}
+	entries := filterByActor(allEntries, "access-admin")
 	if len(entries) != 1 || entries[0].Action != "reset_password" {
 		t.Fatalf("unexpected audit entries: %+v", entries)
 	}
@@ -643,10 +651,11 @@ func TestAdminHandler_UpdateRole_LogsAuditEntry(t *testing.T) {
 		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
 	}
 
-	entries, err := accessStore.ListAuditLog(ctx)
+	allEntries, err := accessStore.ListAuditLog(ctx)
 	if err != nil {
 		t.Fatalf("ListAuditLog: %v", err)
 	}
+	entries := filterByActor(allEntries, "access-admin")
 	if len(entries) != 1 || entries[0].Action != "update_role" || entries[0].Detail != "role=admin" {
 		t.Fatalf("unexpected audit entries: %+v", entries)
 	}
@@ -669,12 +678,21 @@ func TestAdminHandler_AuditLog_ReturnsEntries(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
-	var resp []auditEntryResponse
-	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+	var allResp []auditEntryResponse
+	if err := json.NewDecoder(rec.Body).Decode(&allResp); err != nil {
 		t.Fatalf("decoding response: %v", err)
 	}
+	// The endpoint is unfiltered across the whole table; scope to this
+	// test's own actor so real admin-panel activity elsewhere in a
+	// shared dev database never breaks this assertion.
+	resp := make([]auditEntryResponse, 0, len(allResp))
+	for _, e := range allResp {
+		if e.ActorUsername == "access-admin" {
+			resp = append(resp, e)
+		}
+	}
 	if len(resp) != 1 {
-		t.Fatalf("expected 1 entry, got %d", len(resp))
+		t.Fatalf("expected 1 entry for access-admin, got %d", len(resp))
 	}
 	if resp[0].ActorUsername != "access-admin" || resp[0].Action != "grant_feature" {
 		t.Fatalf("unexpected entry: %+v", resp[0])

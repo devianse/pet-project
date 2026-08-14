@@ -142,17 +142,36 @@ the framing and roadmap these decisions feed into.
   meant to be a cross-cutting platform feature (see `PLANNING.md`'s
   "Platform shell" section), needed before Shopping List's live-sync
   core loop or Date Night's deferred live-update follow-up can land.
-- **Telegram bot integration** — not started, design approved and
-  spec'd: `docs/superpowers/specs/2026-08-14-telegram-bot-design.md`.
-  Another cross-cutting platform capability like WebSockets (see
-  `PLANNING.md`'s "Platform shell" section) — two-way (commands in,
-  notifications out), single-owner for v1, hand-rolled (no new
-  dependency), long-polling not webhook. v1 closes Date Night's
-  already-deferred "notify on propose/accept/decline" gap and adds
-  `/notes` + `/newnote` commands. Motivated by a later goal — a
-  financial-subscription tracker (renewal-due notifications, spend
-  totals) — that's explicitly out of scope for this spec and gets its
-  own design once this lands.
+- **Telegram bot integration** — v1 (commands-in only: `/notes`,
+  `/newnote`) built on the `telegram` branch, not yet merged; see
+  `planning/history.md` entry 14. Design/spec:
+  `docs/superpowers/specs/2026-08-14-telegram-bot-design.md`. Another
+  cross-cutting platform capability like WebSockets (see `PLANNING.md`'s
+  "Platform shell" section) — two-way (commands in, notifications out)
+  in the full design, single-owner for v1, hand-rolled (no new
+  dependency), long-polling not webhook. The notifications-out half
+  (Date Night's already-deferred "notify on propose/accept/decline"
+  gap; a later financial-subscription tracker's renewal-due
+  notifications) is still not started — v1 shipped commands-in only.
+- **`notes`/feature multi-tenancy** — `notes` (and most other feature
+  tables) currently have no owner column: single flat table, one
+  implicit shared owner. Once a feature gets a real `user_id` column,
+  its tests should adopt the scoping convention `internal/access`/
+  `internal/auth` already use (distinct fixture usernames per package,
+  `DELETE` scoped to that owner's rows only) instead of an unscoped
+  `DELETE FROM <table>` at setup. That scoping is also the permanent
+  fix for a concurrency gap found while closing out the `telegram`
+  branch: `internal/notes` and `cmd/api`'s telegram tests both run
+  unscoped `DELETE FROM notes` against the same shared table, and
+  `go test ./...`'s default parallel-package execution lets one
+  package's setup race another's mid-test (reproduced 1-in-3 runs:
+  content collisions and a row deleted out from under a test between
+  its own insert and delete). Current stopgap: `make test-backend`
+  runs `go test -p 1 ./...`, serializing package execution so the race
+  can't happen — intentionally temporary, not meant to be built out
+  further (no advisory locks, no bespoke isolation abstraction).
+  Once `notes` is user-scoped, the race disappears as a side effect of
+  the ownership-scoped test convention above, and `-p 1` can go away.
 - **Which of Shopping List / Image Processing** gets built first once
   phase 3 resumes, or whether they're built in parallel.
 - **OCR approach** (local Tesseract vs cloud API), if/when Image
