@@ -89,21 +89,41 @@ the framing and roadmap these decisions feed into.
   see `planning/history.md` step 12. Merged to `main` via PR #15; same
   accepted gap as the two admin-panel branches before it — no browser
   click-through, verified via backend tests and static review.
+- ~~Admin panel expansion, audit trail + ops/system panel~~ — built on
+  the `audit-ops` branch: a read-only introspection page added to
+  `/admin`, admin-action audit log (grant/revoke/create/deactivate/
+  reactivate/reset-password/role-change, who + when) plus basic system
+  health (DB ping, deployed git SHA via `GIT_SHA`). New
+  `admin_audit_log` table, `access.Store.LogAction`/`ListAuditLog`,
+  `GET /api/admin/audit-log`; every mutating admin handler logs via a
+  shared helper post-write. `/api/health` extended to ping the DB and
+  report version. See `planning/history.md` step 13. Bounded-path work
+  (brainstormed, short in-chat design, no spec doc). Not yet merged to
+  `main` (branch: `audit-ops`). Two follow-ups deferred out of this
+  pass, see below: audit log is capped to a 400px scrollable block
+  client-side (the backend already caps `ListAuditLog` at 100 rows —
+  no pagination control either way, just a visible/scrollable window
+  vs. a hard invisible cutoff), and the panel doesn't live-update.
 
 ## Still open
 
-- **Admin panel expansion, deferred: observability** — two more
-  options from the same brainstorm, intentionally not started:
-  - **Audit trail + ops/system panel** (grouped) — an admin-action log
-    (who granted/revoked/promoted/demoted/created/deleted, when) next
-    to basic system health (DB connectivity, deployed version). Grouped
-    since both are small, read-only, single-page introspection into the
-    platform itself, unlike the option below.
-  - **App data moderation** (kept separate) — read visibility into
-    Notes/Watchlist/Date Night rows without SSHing in to query Postgres
-    directly. Kept separate since it spans three unrelated domain
-    schemas and is realistically its own multi-part effort, not a
-    bolt-on to the other two.
+- **Admin panel expansion, deferred: app data moderation** — the
+  remaining option from the same brainstorm as the audit-trail/ops
+  panel above (now resolved): read visibility into Notes/Watchlist/
+  Date Night rows without SSHing in to query Postgres directly. Spans
+  three unrelated domain schemas and is realistically its own
+  multi-part effort, not a bolt-on.
+
+- **Ops panel live-update** — deferred out of the audit trail + ops
+  panel feature above. Today the health card and audit log only fetch
+  once on page mount, same as the rest of `/admin` — an action taken in
+  one tab (or by another admin) doesn't appear until the page is
+  reloaded. Long-polling was raised as a lighter-weight stopgap; the
+  real fix is likely the same WebSockets work already deferred below
+  for Date Night/Shopping List, since it'd be one more consumer of the
+  same cross-cutting real-time mechanism rather than a bespoke polling
+  loop just for this page. Worth deciding at WebSockets design time
+  rather than building a one-off now.
 
 - **Self-service email password reset** — deferred out of the user
   lifecycle management feature above, where the admin-triggered reset

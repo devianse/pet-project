@@ -7,9 +7,13 @@ import {
   createUser,
   setUserActive,
   resetUserPassword,
+  getHealth,
+  getAuditLog,
   KNOWN_FEATURES,
   type AdminUser,
   type FeatureKey,
+  type HealthStatus,
+  type AdminAuditEntry,
 } from '@/shared/api'
 import { Card } from '@/components/pouf/surface'
 import { Button } from '@/components/pouf/Button'
@@ -39,6 +43,13 @@ export default function AdminPage() {
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState<Set<string>>(new Set())
 
+  // Ops: fetched once on mount, no polling — matches this page's existing
+  // non-live conventions (the Access matrix only refetches after a
+  // mutation, never on a timer).
+  const [health, setHealth] = useState<HealthStatus | null>(null)
+  const [auditLog, setAuditLog] = useState<AdminAuditEntry[]>([])
+  const [opsError, setOpsError] = useState<string | null>(null)
+
   const [newUsername, setNewUsername] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [newRole, setNewRole] = useState<'admin' | 'user'>('user')
@@ -59,6 +70,12 @@ export default function AdminPage() {
 
   useEffect(() => {
     load()
+    getHealth()
+      .then(setHealth)
+      .catch(() => setOpsError((prev) => prev ?? 'failed to load system health'))
+    getAuditLog()
+      .then(setAuditLog)
+      .catch(() => setOpsError((prev) => prev ?? 'failed to load audit log'))
   }, [])
 
   // Re-fetches after every toggle rather than patching local state: the
@@ -214,7 +231,7 @@ export default function AdminPage() {
               {(id) => (
                 <select
                   id={id}
-                  className="rounded-lg bg-bg px-2 py-1 font-bold text-ink min-h-[52px] w-full"
+                  className="rounded-lg bg-bg px-2 py-1 font-bold text-ink min-h-13 w-full"
                   value={newRole}
                   onChange={(e) => setNewRole(e.target.value as 'admin' | 'user')}
                 >
@@ -352,6 +369,73 @@ export default function AdminPage() {
             </tbody>
           </table>
         </div>
+      </Card>
+
+      <div className="space-y-2">
+        <p className="text-lg font-bold text-muted">Ops</p>
+      </div>
+      {opsError && (
+        <p className="font-bold text-(--on-accent) bg-orange rounded-xl px-3 py-2 self-start">
+          {opsError}
+        </p>
+      )}
+
+      <Card>
+        <Stack gap={2}>
+          <h2 className="text-lg font-black text-ink">System health</h2>
+          {health ? (
+            <div className="flex gap-6">
+              <p className="font-bold text-ink">
+                DB: <span className={health.db === 'ok' ? 'text-mint' : 'text-orange'}>{health.db}</span>
+              </p>
+              <p className="font-bold text-ink">
+                Version: <span className="font-mono">{health.version}</span>
+              </p>
+            </div>
+          ) : (
+            <p className="font-bold text-muted">Loading…</p>
+          )}
+        </Stack>
+      </Card>
+
+      <Card>
+        <Stack gap={2}>
+          <h2 className="text-lg font-black text-ink">Audit log</h2>
+          {/* Capped at 400px (~8 rows) with its own scrollbar — the backend
+              already caps ListAuditLog at 100 rows, this caps how much of
+              that fits on screen at once without a "load more" control. */}
+          <div className="overflow-x-auto overflow-y-auto max-h-100">
+            <table className="w-full border-collapse text-left">
+              <thead className="sticky top-0 bg-surface">
+                <tr>
+                  <th className="p-2 font-black text-ink">When</th>
+                  <th className="p-2 font-black text-ink">Actor</th>
+                  <th className="p-2 font-black text-ink">Action</th>
+                  <th className="p-2 font-black text-ink">Target</th>
+                  <th className="p-2 font-black text-ink">Detail</th>
+                </tr>
+              </thead>
+              <tbody>
+                {auditLog.map((entry, i) => (
+                  <tr key={i}>
+                    <td className="p-2 text-muted">{new Date(entry.created_at).toLocaleString()}</td>
+                    <td className="p-2 font-bold text-ink">{entry.actor_username}</td>
+                    <td className="p-2 font-bold text-ink">{entry.action}</td>
+                    <td className="p-2 text-ink">{entry.target_username ?? '—'}</td>
+                    <td className="p-2 text-muted">{entry.detail || '—'}</td>
+                  </tr>
+                ))}
+                {auditLog.length === 0 && (
+                  <tr>
+                    <td className="p-2 text-muted" colSpan={5}>
+                      No admin actions recorded yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Stack>
       </Card>
     </Stack>
   )

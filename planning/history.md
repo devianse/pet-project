@@ -175,3 +175,39 @@ matches `PLANNING.md`'s shell-first order one-for-one — see that file's
     vulnerabilities unrelated to this branch — no new dependency was
     added). Same accepted gap as steps 10-11: no browser click-through,
     verified via backend tests and static review only.
+13. **Audit trail + ops/system panel** (done, on the `audit-ops` branch,
+    not yet merged) — the first of the two deferred admin-panel
+    observability options from step 12's decision (the other, app data
+    moderation, stays deferred — see `planning/decisions.md`). A
+    read-only introspection page added to the same `/admin` panel as
+    steps 10-12: an admin-action audit log (who granted/revoked
+    features, created/deactivated/reactivated a user, reset a password,
+    or changed a role, and when) plus basic system health (DB
+    connectivity, deployed git SHA). Backend: a new `admin_audit_log`
+    table (actor, action, optional target user, free-text detail,
+    timestamp), `access.Store.LogAction`/`ListAuditLog` (newest-first,
+    capped at 100 rows), and a `GET /api/admin/audit-log` handler.
+    Every existing mutating admin handler (`GrantFeature`,
+    `RevokeFeature`, `CreateUser`, `SetActive`, `ResetPassword`,
+    `UpdateRole`) now calls a shared `logAction` helper after a
+    successful write — a logging failure doesn't fail the request
+    itself. `cmd/api`'s `/api/health` handler was extended to ping the
+    DB and report a `GIT_SHA`-sourced version string (falls back to
+    "unknown" locally where that env var isn't set); `infra/
+    docker-compose.yml` and both deployment-runbook docs pass `GIT_SHA`
+    through at deploy time. Frontend: a new "Ops" section on `/admin`
+    below the existing Access table — a system-health card and an
+    audit-log table (When/Actor/Action/Target/Detail). Bounded-path
+    work (brainstormed, short in-chat design approved, no spec doc) —
+    an extension of the existing admin flow, not a new subsystem. TDD
+    throughout on the backend (store + handler tests, each watched fail
+    first, run against real Postgres); frontend followed the same
+    untested convention as the rest of `/admin`. Verified end-to-end
+    with a curl-driven session against a locally running backend (real
+    JWT cookie, grant + deactivate actions, confirmed both showed up
+    correctly ordered in the audit log) — same accepted browser-
+    click-through gap as steps 10-12. `govulncheck`/`npm audit`/
+    `gitleaks` all ran clean (`govulncheck` surfaced the same 6
+    pre-existing Go-toolchain stdlib vulnerabilities as step 12,
+    confirmed present even with this branch's changes stashed out — not
+    introduced here; no new dependency was added).

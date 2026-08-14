@@ -40,16 +40,15 @@ func setupAccessStore(t *testing.T) (*Store, *auth.Store) {
 	}
 
 	usernames := []string{"access-mike", "access-nastya", "access-admin", "access-mw", "access-newbie"}
-	t.Cleanup(func() {
+	cleanup := func() {
 		for _, u := range usernames {
 			conn.Exec(`DELETE FROM feature_access WHERE user_id IN (SELECT id FROM users WHERE username = $1)`, u)
+			conn.Exec(`DELETE FROM admin_audit_log WHERE actor_id IN (SELECT id FROM users WHERE username = $1) OR target_user_id IN (SELECT id FROM users WHERE username = $1)`, u)
 			conn.Exec(`DELETE FROM users WHERE username = $1`, u)
 		}
-	})
-	for _, u := range usernames {
-		conn.Exec(`DELETE FROM feature_access WHERE user_id IN (SELECT id FROM users WHERE username = $1)`, u)
-		conn.Exec(`DELETE FROM users WHERE username = $1`, u)
 	}
+	t.Cleanup(cleanup)
+	cleanup()
 
 	return accessStore, authStore
 }
@@ -204,6 +203,86 @@ func TestHasFeature(t *testing.T) {
 	}
 	if !userHasAfter {
 		t.Fatal("expected granted user to have the feature")
+	}
+}
+
+func TestLogActionAndListAuditLog(t *testing.T) {
+	store, authStore := setupAccessStore(t)
+	ctx := context.Background()
+	actorID := createTestUser(t, authStore, "access-admin", "admin")
+	targetID := createTestUser(t, authStore, "access-mike", "user")
+
+	if err := store.LogAction(ctx, actorID, "update_role", &targetID, "role: user -> admin"); err != nil {
+		t.Fatalf("LogAction: %v", err)
+	}
+
+	entries, err := store.ListAuditLog(ctx)
+	if err != nil {
+		t.Fatalf("ListAuditLog: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 audit entry, got %d", len(entries))
+	}
+	got := entries[0]
+	if got.ActorUsername != "access-admin" {
+		t.Fatalf("expected actor username access-admin, got %q", got.ActorUsername)
+	}
+	if got.Action != "update_role" {
+		t.Fatalf("expected action update_role, got %q", got.Action)
+	}
+	if got.TargetUsername == nil || *got.TargetUsername != "access-mike" {
+		t.Fatalf("expected target username access-mike, got %v", got.TargetUsername)
+	}
+	if got.Detail != "role: user -> admin" {
+		t.Fatalf("expected detail %q, got %q", "role: user -> admin", got.Detail)
+	}
+	if got.CreatedAt.IsZero() {
+		t.Fatal("expected non-zero CreatedAt")
+	}
+}
+
+func TestLogAction_TargetUserOptional(t *testing.T) {
+	store, authStore := setupAccessStore(t)
+	ctx := context.Background()
+	actorID := createTestUser(t, authStore, "access-admin", "admin")
+
+	if err := store.LogAction(ctx, actorID, "create_user", nil, "username=access-newbie"); err != nil {
+		t.Fatalf("LogAction: %v", err)
+	}
+
+	entries, err := store.ListAuditLog(ctx)
+	if err != nil {
+		t.Fatalf("ListAuditLog: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 audit entry, got %d", len(entries))
+	}
+	if entries[0].TargetUsername != nil {
+		t.Fatalf("expected nil target username, got %v", *entries[0].TargetUsername)
+	}
+}
+
+func TestListAuditLog_NewestFirst(t *testing.T) {
+	store, authStore := setupAccessStore(t)
+	ctx := context.Background()
+	actorID := createTestUser(t, authStore, "access-admin", "admin")
+
+	if err := store.LogAction(ctx, actorID, "grant_feature", nil, "feature=notes"); err != nil {
+		t.Fatalf("first LogAction: %v", err)
+	}
+	if err := store.LogAction(ctx, actorID, "revoke_feature", nil, "feature=notes"); err != nil {
+		t.Fatalf("second LogAction: %v", err)
+	}
+
+	entries, err := store.ListAuditLog(ctx)
+	if err != nil {
+		t.Fatalf("ListAuditLog: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 audit entries, got %d", len(entries))
+	}
+	if entries[0].Action != "revoke_feature" || entries[1].Action != "grant_feature" {
+		t.Fatalf("expected newest-first order, got %v then %v", entries[0].Action, entries[1].Action)
 	}
 }
 

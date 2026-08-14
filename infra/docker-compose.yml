@@ -24,6 +24,7 @@ services:
       TMDB_READ_ACCESS_TOKEN: ${TMDB_READ_ACCESS_TOKEN}
       JWT_SECRET: ${JWT_SECRET}
       ENV: production
+      GIT_SHA: ${GIT_SHA}
     depends_on:
       postgres:
         condition: service_healthy
