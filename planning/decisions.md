@@ -75,6 +75,14 @@ second copy.
   (Date Night's already-deferred "notify on propose/accept/decline"
   gap; a later financial-subscription tracker's renewal-due
   notifications) is still not started — v1 shipped commands-in only.
+- **OpenTelemetry** — not started, no design yet. Requested want:
+  observability (traces/metrics/logs) across the backend, presumably the
+  reverse proxy too. Open questions to resolve before this is buildable:
+  what backend/collector it ships to (self-hosted on the VPS vs. a
+  hosted vendor — cost/complexity tradeoff given the "one small VPS, no
+  k8s" constraint elsewhere in `PLANNING.md`), whether it replaces or
+  sits alongside the existing `slog`-based logging, and where it lands
+  relative to WebSockets/Telegram in priority.
 - **`notes`/feature multi-tenancy** — `notes` (and most other feature
   tables) currently have no owner column: single flat table, one
   implicit shared owner. Once a feature gets a real `user_id` column,
