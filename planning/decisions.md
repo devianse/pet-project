@@ -145,6 +145,21 @@ second copy.
   further (no advisory locks, no bespoke isolation abstraction).
   Once `notes` is user-scoped, the race disappears as a side effect of
   the ownership-scoped test convention above, and `-p 1` can go away.
+- **`cmd/api/main.go` split** — raised while writing the WebSockets shell
+  plan (2026-08-15): `main()` does everything in one ~200-line pass —
+  reads env vars, constructs every store/handler, registers every route
+  on `mux`, starts the server — with no `buildMux(...)`/`newApp(...)`
+  function that returns the wired router as a value. Noticed because it
+  meant Task 7 of that plan couldn't hit `/api/ws` through a real router
+  in a test without a refactor bigger than that task needed, so it
+  didn't add one (relied on `internal/realtime`'s own handler tests
+  instead — see `docs/superpowers/plans/2026-08-15-websockets-shell.md`
+  Task 7). Not a current bug — every route's behavior is already tested
+  at the package level (`internal/auth`, `internal/access`, etc.), and
+  `main.go` wiring is trusted by inspection like the rest of that file.
+  Worth a real look once it grows past this point (each new feature adds
+  ~10-15 more lines of route registration) or the next time something
+  wants to test routing/wiring directly — no design yet.
 - **Which of Shopping List / Image Processing** gets built first once
   phase 3 resumes, or whether they're built in parallel.
 - **OCR approach** (local Tesseract vs cloud API), if/when Image
