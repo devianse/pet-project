@@ -3,7 +3,7 @@
 # container. Primary use: after provisioning a fresh VPS during a
 # migration, run this against infra/docker-compose.yml's postgres
 # service before cutting DNS over — see
-# infra/deployment-runbook/04-restore-backup.md. Also used to test the
+# infra/deployment-runbook/06-restore-backup.md. Also used to test the
 # backup/restore round-trip locally (see infra/restore_test.sh).
 #
 # Usage: infra/restore.sh <dump-file> [container]
@@ -39,7 +39,7 @@ main() {
   fi
 
   if [[ -z "$container" ]]; then
-    container=$(docker compose ps -q postgres)
+    container=$(docker compose ps -q postgres 2>/dev/null || true)
     if [[ -z "$container" ]]; then
       echo "restore.sh: no running 'postgres' service found via docker compose (run from infra/, or pass a container name explicitly)" >&2
       exit 1

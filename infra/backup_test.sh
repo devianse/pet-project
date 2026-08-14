@@ -2,9 +2,13 @@
 # Unit tests for infra/backup.sh's local-only logic (prune_old_backups).
 # Does not touch SSH or Docker — safe to run anywhere, anytime.
 set -uo pipefail  # not -e: we want every assertion to run and report
+# (sourcing backup.sh below re-enables -e via its own `set -euo
+# pipefail`, since source runs in this same shell — turned back off
+# right after the source so a failed assertion doesn't abort the run)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/backup.sh"
+set +e
 
 fail=0
 

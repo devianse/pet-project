@@ -52,6 +52,19 @@ assert_contains "empty file -> error message" "$out" "empty"
 assert_nonzero_exit "empty file -> nonzero exit" "$code"
 rm -f "$empty_file"
 
+if ! command -v docker >/dev/null 2>&1; then
+  echo "SKIP: Docker not available, skipping 'no running postgres service' test"
+else
+  no_compose_dir=$(mktemp -d)
+  valid_dump=$(mktemp --suffix=.dump)
+  echo "not empty" > "$valid_dump"
+  out=$(cd "$no_compose_dir" && "$SCRIPT_DIR/restore.sh" "$valid_dump" 2>&1); code=$?
+  assert_contains "no container arg, no compose file -> friendly error" "$out" "no running"
+  assert_nonzero_exit "no container arg, no compose file -> nonzero exit" "$code"
+  rm -f "$valid_dump"
+  rmdir "$no_compose_dir"
+fi
+
 # --- Part 2: integration round-trip (requires Docker) ---
 
 if ! command -v docker >/dev/null 2>&1; then

@@ -11,6 +11,7 @@
 #   clone so a dump full of usernames/password hashes/notes content
 #   can never land inside a `git add -A`.
 set -euo pipefail
+umask 077
 
 usage() {
   echo "Usage: infra/backup.sh <vps-host>" >&2
