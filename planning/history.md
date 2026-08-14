@@ -262,3 +262,27 @@ matches `PLANNING.md`'s shell-first order one-for-one — see that file's
     Task 5 of the plan (manual verification against the real Telegram
     API) was explicitly not automated — needs a real bot token and a
     real Telegram account, left for manual follow-up.
+15. **Backend process lifecycle hardening** (done, on the
+    `backend-graceful-shutdown` branch, not yet merged) — a small
+    follow-up prompted by a `golang-design-patterns` review-mode audit
+    of the backend, done ahead of phase 2's WebSockets work so
+    shutdown/lifecycle plumbing exists before long-lived socket
+    connections make it more consequential. Three fixes: `cmd/api`'s
+    `main` now derives a root `context.Context` from
+    `signal.NotifyContext` (SIGINT/SIGTERM) and threads it through the
+    Telegram poller and the login-rate-limiter cleanup loop (both
+    previously started with `context.Background()`, so neither could be
+    stopped independently of killing the whole process); `srv.ListenAndServe`
+    now runs in its own goroutine so the main goroutine can call
+    `srv.Shutdown` (10s drain timeout) on that same signal, closing the
+    DB pool only after the server has actually stopped instead of
+    racing it; and `internal/db.Open`'s startup `Ping` gained a 5s
+    timeout, matching every other external call in the codebase (TMDb,
+    Telegram) instead of being the one unbounded one. No schema change,
+    no new dependency, no env var change. `govulncheck`/`npm
+    audit`/`gitleaks` all ran clean.
+
+    Deliberately left for later: connection-pool sizing
+    (`SetMaxOpenConns`/`SetMaxIdleConns`/`SetConnMaxLifetime`) — flagged
+    by the same audit but judged low-value at this app's current
+    traffic (a handful of invited users), not worth bundling in here.

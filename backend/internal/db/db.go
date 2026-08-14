@@ -1,11 +1,19 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
+
+// pingTimeout bounds the startup connectivity check below — every other
+// external call in this codebase (TMDb, Telegram) has an explicit
+// timeout; a reachable-but-slow Postgres shouldn't be able to hang
+// startup indefinitely.
+const pingTimeout = 5 * time.Second
 
 // Open connects to Postgres via the pgx stdlib driver and verifies the
 // connection with a Ping before returning, so callers don't have to
@@ -15,7 +23,10 @@ func Open(databaseURL string) (*sql.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("opening db: %w", err)
 	}
-	if err := conn.Ping(); err != nil {
+
+	ctx, cancel := context.WithTimeout(context.Background(), pingTimeout)
+	defer cancel()
+	if err := conn.PingContext(ctx); err != nil {
 		return nil, fmt.Errorf("pinging db: %w", err)
 	}
 	return conn, nil
