@@ -157,8 +157,9 @@ func (s *Store) UpdateRole(ctx context.Context, id int64, role string) (*User, e
 // SetActive sets a user's is_active flag. A false value blocks future
 // logins (checked in Handler.Login) without touching any other row —
 // the deliberately chosen alternative to a hard delete (see
-// planning/decisions.md). Callers (access.AdminHandler) are responsible
-// for the self-deactivate guard, same division of labor as UpdateRole.
+// docs/adr/0002-soft-delete-users.md). Callers (access.AdminHandler) are
+// responsible for the self-deactivate guard, same division of labor as
+// UpdateRole.
 func (s *Store) SetActive(ctx context.Context, id int64, isActive bool) (*User, error) {
 	row := s.conn.QueryRowContext(ctx, `
 		UPDATE users SET is_active = $1

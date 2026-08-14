@@ -1,9 +1,13 @@
 # pet-projects
 
 Orientation for me, not a duplicate of the other docs — see
-[`README.md`](./README.md) for what this is and how to run it, and
-[`PLANNING.md`](./PLANNING.md) for the full architecture and reasoning.
-Check both before assuming a decision hasn't been made.
+[`README.md`](./README.md) for what this is and how to run it,
+[`PLANNING.md`](./PLANNING.md) for the full architecture and reasoning,
+[`CONTEXT.md`](./CONTEXT.md) for domain terminology, and
+[`docs/adr/`](./docs/adr/) for durable architectural decisions (why, not
+just what — `planning/decisions.md` covers the rest as a lighter-weight
+open-questions log). Check all before assuming a decision hasn't been
+made, or a term is undefined.
 
 ## Current phase
 
@@ -56,6 +60,11 @@ terminals simultaneously, which README explains in detail.
   to the browser bundle — no `VITE_` prefix needed).
 - Frontend dev server defaults to port 3000 (not Vite's default 5173) —
   a deliberate choice, not a leftover.
+- **Backend Go code**: apply the `golang-design-patterns` skill —
+  Design mode when a task involves a new constructor, package shape, or
+  architecture choice (during planning or a `subagent-driven-development`
+  task); Review mode as one lens of the final whole-branch review before
+  merge, alongside `code-review`/`security-review`.
 
 ## Secrets
 

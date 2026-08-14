@@ -9,7 +9,8 @@ description: Use when implementation on a feature branch in this repo is complet
 
 This repo's definition of done is more than a green test suite: planning
 docs (`planning/history.md`, `PLANNING.md`, `infra/deployment-runbook/`,
-`CHEATSHEET.local/`) need to stay in sync with what shipped, and
+`CHEATSHEET.local/`, `CONTEXT.md`, `docs/adr/`) need to stay in sync with
+what shipped, and
 subagent-driven development tends to leave dev servers and ad hoc docker
 containers running. This skill closes both gaps before handing off to
 `finishing-a-development-branch` for the actual merge/PR/keep decision —
@@ -68,6 +69,13 @@ not mechanical edits:
   changed (docker-compose, Caddyfile, env surface touching prod).
 - **`CHEATSHEET.local/`** — only if Step 2 flagged schema/CLI drift, or
   a new dev command/gotcha came up this session.
+- **`CONTEXT.md`** — only if the branch introduced or resolved a domain
+  term (a new concept, a renamed one, a term used two different ways).
+  Use `domain-modeling`'s format and rules rather than freehand editing.
+- **`docs/adr/`** — only if the branch made a decision that's hard to
+  reverse, would surprise a future reader, and came from a real
+  trade-off (all three — see `domain-modeling`'s ADR criteria). Most
+  branches won't clear this bar; don't force one.
 
 Skip a doc outright rather than drafting a no-op update — say which
 ones you're skipping and why in one line each.

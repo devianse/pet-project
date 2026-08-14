@@ -57,9 +57,8 @@ either way):
 - **Storage**: no S3/object storage — a local Docker volume is enough at
   this scale; revisit only if a later project's file storage needs
   actually grow past that.
-- **No Kubernetes / load balancer** — one VPS, one instance of the stack
-  is the whole architecture. LB/orchestration solves a scaling problem
-  this doesn't have.
+- **No Kubernetes / load balancer** — see
+  `docs/adr/0003-single-vps-no-orchestration.md`.
 
 ## Deployment target — later decision, not the first step
 

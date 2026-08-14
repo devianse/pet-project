@@ -226,7 +226,7 @@ type createUserRequest struct {
 // main and the other in package access, and it's a handful of lines.
 // Unlike the CLI, there's no -display-name flag: the created user sets
 // their own via the profile popover after first login (see
-// planning/decisions.md's "user lifecycle management" entry).
+// planning/history.md step 12).
 func (h *AdminHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	var req createUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -284,10 +284,11 @@ type setActiveRequest struct {
 }
 
 // SetActive activates/deactivates user {id} — a soft, reversible
-// alternative to deleting the row (see planning/decisions.md). Mirrors
-// UpdateRole's shape exactly, including the self-guard: an admin can't
-// lock themselves out through this endpoint, checked server-side since a
-// UI-only disabled control is trivially bypassed with curl.
+// alternative to deleting the row (see
+// docs/adr/0002-soft-delete-users.md). Mirrors UpdateRole's shape
+// exactly, including the self-guard: an admin can't lock themselves out
+// through this endpoint, checked server-side since a UI-only disabled
+// control is trivially bypassed with curl.
 func (h *AdminHandler) SetActive(w http.ResponseWriter, r *http.Request) {
 	userID, ok := platform.IDParam(r)
 	if !ok {
