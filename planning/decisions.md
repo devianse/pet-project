@@ -75,6 +75,21 @@ second copy.
   (Date Night's already-deferred "notify on propose/accept/decline"
   gap; a later financial-subscription tracker's renewal-due
   notifications) is still not started — v1 shipped commands-in only.
+
+  **Deployment setup, decided but not yet done (2026-08-14)**: dev and
+  prod need **two separate bots** (two `@BotFather`-issued tokens), not
+  one bot shared across both. `Poller`'s `GetUpdates` long-poll only
+  allows one active consumer per bot token — two envs polling the same
+  token race and get `409 Conflict`ed against each other, and there's
+  no way to route "this update is for dev vs. prod" anyway (`chat_id`
+  identifies the Telegram *account* messaging the bot — same value
+  across all devices/clients of that account and across every bot it
+  DMs — not which backend should handle it). So: `TELEGRAM_CHAT_ID`
+  stays identical in `backend/.env` and `infra/.env` (still your own
+  account either way); `TELEGRAM_BOT_TOKEN` differs (one bot for dev,
+  one for prod). Next step: set up the **dev** bot/token first, verify
+  `/notes`/`/newnote` end-to-end locally, before touching `infra/.env`
+  for prod.
 - **OpenTelemetry** — not started, no design yet. Requested want:
   observability (traces/metrics/logs) across the backend, presumably the
   reverse proxy too. Open questions to resolve before this is buildable:

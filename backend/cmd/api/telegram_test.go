@@ -137,10 +137,22 @@ func TestNotesNewCommand_EmptyArgsRepliesUsage(t *testing.T) {
 	}
 }
 
+func TestHelpCommand_ListsAllRegisteredCommandsViaRouter(t *testing.T) {
+	router := telegram.NewRouter()
+	router.Handle("/notes", "list all notes", func(_ context.Context, _ string) (string, error) { return "", nil })
+	router.Handle("/help", "list available commands", helpCommand(router))
+
+	reply := router.Dispatch(context.Background(), "/help")
+	want := "/notes — list all notes\n/help — list available commands"
+	if reply != want {
+		t.Fatalf("expected %q, got %q", want, reply)
+	}
+}
+
 func TestNotesNewCommand_BareCommandViaRouter(t *testing.T) {
 	store := setupNotesStore(t)
 	router := telegram.NewRouter()
-	router.Handle("/newnote", notesNewCommand(store))
+	router.Handle("/newnote", "add a new note: /newnote <text>", notesNewCommand(store))
 
 	reply := router.Dispatch(context.Background(), "/newnote")
 	if reply != "usage: /newnote <text>" {

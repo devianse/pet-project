@@ -37,13 +37,33 @@ func startTelegramBot(ctx context.Context, logger *slog.Logger, notesStore *note
 	}
 
 	router := telegram.NewRouter()
-	router.Handle("/notes", notesListCommand(notesStore))
-	router.Handle("/newnote", notesNewCommand(notesStore))
+	router.Handle("/notes", "list all notes", notesListCommand(notesStore))
+	router.Handle("/newnote", "add a new note: /newnote <text>", notesNewCommand(notesStore))
+	router.Handle("/help", "list available commands", helpCommand(router))
 
 	client := telegram.NewRealClient(token)
+	// Populates Telegram's native command menu (the "/" button next to
+	// the message box) with the same prefix/description pairs /help
+	// prints — best-effort: a failure here doesn't stop the bot from
+	// working, it just leaves the menu stale or empty, so it's logged
+	// rather than fatal.
+	if err := client.SetMyCommands(ctx, router.Commands()); err != nil {
+		logger.Error("telegram: failed to set command menu", "error", err)
+	}
+
 	poller := telegram.NewPoller(client, chatID, router)
 	go poller.Run(ctx)
 	logger.Info("telegram bot poller started")
+}
+
+// helpCommand replies with every registered command and its description,
+// one per line — generated from router.Commands() so it can never drift
+// out of sync with what's actually registered (including itself, since
+// Router.Handle appends before Dispatch is ever called).
+func helpCommand(router *telegram.Router) telegram.CommandFunc {
+	return func(_ context.Context, _ string) (string, error) {
+		return router.HelpText(), nil
+	}
 }
 
 // maxReplyChars caps how long a /notes reply is allowed to get, well under

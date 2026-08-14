@@ -51,7 +51,7 @@ func TestPoller_Run_DispatchesFromAllowedChatAndReplies(t *testing.T) {
 	}
 
 	router := NewRouter()
-	router.Handle("/ping", func(_ context.Context, _ string) (string, error) { return "pong", nil })
+	router.Handle("/ping", "ping", func(_ context.Context, _ string) (string, error) { return "pong", nil })
 
 	p := NewPoller(fc, 555, router)
 	p.Run(ctx)
@@ -73,7 +73,7 @@ func TestPoller_Run_DropsMessageFromUnrecognizedChatSilently(t *testing.T) {
 	}
 
 	router := NewRouter()
-	router.Handle("/ping", func(_ context.Context, _ string) (string, error) { return "pong", nil })
+	router.Handle("/ping", "ping", func(_ context.Context, _ string) (string, error) { return "pong", nil })
 
 	p := NewPoller(fc, 555, router)
 	p.Run(ctx)
@@ -98,7 +98,7 @@ func TestPoller_Run_AdvancesOffsetPastEveryUpdate(t *testing.T) {
 	}
 
 	router := NewRouter()
-	router.Handle("/ping", func(_ context.Context, _ string) (string, error) { return "pong", nil })
+	router.Handle("/ping", "ping", func(_ context.Context, _ string) (string, error) { return "pong", nil })
 
 	p := NewPoller(fc, 555, router)
 

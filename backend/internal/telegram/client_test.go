@@ -71,6 +71,43 @@ func TestRealClient_SendMessage_ReturnsErrorOnAPIFailure(t *testing.T) {
 	}
 }
 
+func TestRealClient_SetMyCommands_StripsPrefixSlashAndTrailingSpace(t *testing.T) {
+	var gotPath string
+	var gotBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		json.NewDecoder(r.Body).Decode(&gotBody)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"ok":true,"result":true}`))
+	}))
+	defer server.Close()
+
+	client := newRealClient(server.URL, "test-token")
+	commands := []Command{
+		{Prefix: "/notes", Description: "list notes"},
+		{Prefix: "/newnote ", Description: "add a note"},
+	}
+	if err := client.SetMyCommands(context.Background(), commands); err != nil {
+		t.Fatalf("SetMyCommands: %v", err)
+	}
+
+	if !strings.HasSuffix(gotPath, "/bottest-token/setMyCommands") {
+		t.Fatalf("expected path ending in /bottest-token/setMyCommands, got %q", gotPath)
+	}
+	got, ok := gotBody["commands"].([]any)
+	if !ok || len(got) != 2 {
+		t.Fatalf("expected 2 commands, got %v", gotBody["commands"])
+	}
+	first := got[0].(map[string]any)
+	if first["command"] != "notes" || first["description"] != "list notes" {
+		t.Fatalf("unexpected first command: %+v", first)
+	}
+	second := got[1].(map[string]any)
+	if second["command"] != "newnote" || second["description"] != "add a note" {
+		t.Fatalf("expected trailing space stripped from prefix, got %+v", second)
+	}
+}
+
 func TestRealClient_GetUpdates_ParsesResultAndPassesOffset(t *testing.T) {
 	var gotBody map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -178,7 +215,7 @@ func TestPoller_Run_AdvancesOffsetPastMalformedElement(t *testing.T) {
 
 	client := newRealClient(server.URL, "test-token")
 	router := NewRouter()
-	router.Handle("/notes", func(_ context.Context, _ string) (string, error) { return "", nil })
+	router.Handle("/notes", "list notes", func(_ context.Context, _ string) (string, error) { return "", nil })
 	p := NewPoller(client, 555, router)
 	p.Run(ctx)
 
