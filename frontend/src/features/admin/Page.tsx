@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useRealtimeTopic } from '@/shared/useRealtimeTopic'
+import type { Envelope } from '@/shared/realtime'
 import {
   getAdminUsers,
   grantFeature,
@@ -43,9 +45,11 @@ export default function AdminPage() {
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState<Set<string>>(new Set())
 
-  // Ops: fetched once on mount, no polling — matches this page's existing
-  // non-live conventions (the Access matrix only refetches after a
-  // mutation, never on a timer).
+  // Ops: initial snapshot fetched once on mount (below), then kept live
+  // over WebSockets — ops.health replaces the whole health object on
+  // every tick from the backend's HealthTicker; ops.audit prepends each
+  // new entry as AdminHandler.logAction broadcasts it, capped at 100 to
+  // match the REST endpoint's own LIMIT.
   const [health, setHealth] = useState<HealthStatus | null>(null)
   const [auditLog, setAuditLog] = useState<AdminAuditEntry[]>([])
   const [opsError, setOpsError] = useState<string | null>(null)
@@ -77,6 +81,16 @@ export default function AdminPage() {
       .then(setAuditLog)
       .catch(() => setOpsError((prev) => prev ?? 'failed to load audit log'))
   }, [])
+
+  const onHealthUpdate = useCallback((env: Envelope) => {
+    setHealth(env.payload as HealthStatus)
+  }, [])
+  useRealtimeTopic('ops.health', onHealthUpdate)
+
+  const onAuditUpdate = useCallback((env: Envelope) => {
+    setAuditLog((prev) => [env.payload as AdminAuditEntry, ...prev].slice(0, 100))
+  }, [])
+  useRealtimeTopic('ops.audit', onAuditUpdate)
 
   // Re-fetches after every toggle rather than patching local state: the
   // matrix is small (invite-only user base, five known features) and a

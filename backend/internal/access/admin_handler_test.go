@@ -11,7 +11,20 @@ import (
 	"testing"
 
 	"github.com/devianse/pet-project/backend/internal/auth"
+	"github.com/devianse/pet-project/backend/internal/realtime"
 )
+
+// fakeBroadcaster is a test double for the broadcaster interface —
+// records every envelope AdminHandler hands it instead of routing to
+// real subscribers, so tests can assert what was broadcast without
+// standing up a real realtime.Hub + connection.
+type fakeBroadcaster struct {
+	envelopes []realtime.Envelope
+}
+
+func (f *fakeBroadcaster) Broadcast(env realtime.Envelope) {
+	f.envelopes = append(f.envelopes, env)
+}
 
 func TestAdminHandler_ListUsers_ReturnsActualGrantsNotBypass(t *testing.T) {
 	accessStore, authStore := setupAccessStore(t)
@@ -23,7 +36,7 @@ func TestAdminHandler_ListUsers_ReturnsActualGrantsNotBypass(t *testing.T) {
 		t.Fatalf("Grant: %v", err)
 	}
 
-	handler := NewAdminHandler(accessStore, authStore)
+	handler := NewAdminHandler(accessStore, authStore, nil)
 	req := httptest.NewRequest(http.MethodGet, "/api/admin/users", nil)
 	rec := httptest.NewRecorder()
 	handler.ListUsers(rec, req)
@@ -65,7 +78,7 @@ func TestAdminHandler_GrantFeature_ThenListForUserShowsIt(t *testing.T) {
 	callerID := createTestUser(t, authStore, "access-admin", "admin")
 	userID := createTestUser(t, authStore, "access-mike", "user")
 
-	handler := NewAdminHandler(accessStore, authStore)
+	handler := NewAdminHandler(accessStore, authStore, nil)
 	rec := performGrantFeature(t, handler, callerID, userID, "admin", "notes")
 
 	if rec.Code != http.StatusNoContent {
@@ -86,7 +99,7 @@ func TestAdminHandler_GrantFeature_UnknownKeyRejected(t *testing.T) {
 	callerID := createTestUser(t, authStore, "access-admin", "admin")
 	userID := createTestUser(t, authStore, "access-mike", "user")
 
-	handler := NewAdminHandler(accessStore, authStore)
+	handler := NewAdminHandler(accessStore, authStore, nil)
 	rec := performGrantFeature(t, handler, callerID, userID, "admin", "bogus")
 
 	if rec.Code != http.StatusBadRequest {
@@ -103,7 +116,7 @@ func TestAdminHandler_RevokeFeature_RemovesGrant(t *testing.T) {
 		t.Fatalf("Grant: %v", err)
 	}
 
-	handler := NewAdminHandler(accessStore, authStore)
+	handler := NewAdminHandler(accessStore, authStore, nil)
 	rec := performRevokeFeature(t, handler, callerID, userID, "admin", "notes")
 
 	if rec.Code != http.StatusNoContent {
@@ -124,7 +137,7 @@ func TestAdminHandler_RevokeFeature_NothingToRevokeIsStillNoContent(t *testing.T
 	callerID := createTestUser(t, authStore, "access-admin", "admin")
 	userID := createTestUser(t, authStore, "access-mike", "user")
 
-	handler := NewAdminHandler(accessStore, authStore)
+	handler := NewAdminHandler(accessStore, authStore, nil)
 	rec := performRevokeFeature(t, handler, callerID, userID, "admin", "notes")
 
 	if rec.Code != http.StatusNoContent {
@@ -135,7 +148,7 @@ func TestAdminHandler_RevokeFeature_NothingToRevokeIsStillNoContent(t *testing.T
 func TestAdminHandler_GrantFeature_InvalidIDRejected(t *testing.T) {
 	accessStore, authStore := setupAccessStore(t)
 	callerID := createTestUser(t, authStore, "access-admin", "admin")
-	handler := NewAdminHandler(accessStore, authStore)
+	handler := NewAdminHandler(accessStore, authStore, nil)
 
 	secret := []byte("test-secret")
 	token, err := auth.SignToken(secret, callerID, "caller", "admin")
@@ -157,7 +170,7 @@ func TestAdminHandler_GrantFeature_InvalidIDRejected(t *testing.T) {
 func TestAdminHandler_GrantFeature_UnknownUserIDRejected(t *testing.T) {
 	accessStore, authStore := setupAccessStore(t)
 	callerID := createTestUser(t, authStore, "access-admin", "admin")
-	handler := NewAdminHandler(accessStore, authStore)
+	handler := NewAdminHandler(accessStore, authStore, nil)
 
 	// A numeric id that parses fine but matches no row — distinct from
 	// the malformed-id case above, and from Grant's own FK constraint
@@ -198,7 +211,7 @@ func TestAdminHandler_UpdateRole_ChangesRole(t *testing.T) {
 	callerID := createTestUser(t, authStore, "access-admin", "admin")
 	targetID := createTestUser(t, authStore, "access-mike", "user")
 
-	handler := NewAdminHandler(accessStore, authStore)
+	handler := NewAdminHandler(accessStore, authStore, nil)
 	rec := performUpdateRole(t, handler, callerID, targetID, "admin", `{"role":"admin"}`)
 
 	if rec.Code != http.StatusNoContent {
@@ -219,7 +232,7 @@ func TestAdminHandler_UpdateRole_UnknownRoleRejected(t *testing.T) {
 	callerID := createTestUser(t, authStore, "access-admin", "admin")
 	targetID := createTestUser(t, authStore, "access-mike", "user")
 
-	handler := NewAdminHandler(accessStore, authStore)
+	handler := NewAdminHandler(accessStore, authStore, nil)
 	rec := performUpdateRole(t, handler, callerID, targetID, "admin", `{"role":"superuser"}`)
 
 	if rec.Code != http.StatusBadRequest {
@@ -231,7 +244,7 @@ func TestAdminHandler_UpdateRole_UnknownUserIDRejected(t *testing.T) {
 	accessStore, authStore := setupAccessStore(t)
 	callerID := createTestUser(t, authStore, "access-admin", "admin")
 
-	handler := NewAdminHandler(accessStore, authStore)
+	handler := NewAdminHandler(accessStore, authStore, nil)
 	rec := performUpdateRole(t, handler, callerID, 999999999, "admin", `{"role":"admin"}`)
 
 	if rec.Code != http.StatusNotFound {
@@ -244,7 +257,7 @@ func TestAdminHandler_CreateUser_CreatesActiveUser(t *testing.T) {
 	ctx := context.Background()
 	callerID := createTestUser(t, authStore, "access-admin", "admin")
 
-	handler := NewAdminHandler(accessStore, authStore)
+	handler := NewAdminHandler(accessStore, authStore, nil)
 	body := `{"username":"access-newbie","password":"s3cret-pass","role":"user"}`
 	rec := performCreateUser(t, handler, callerID, "admin", body)
 
@@ -274,7 +287,7 @@ func TestAdminHandler_CreateUser_DuplicateUsernameRejected(t *testing.T) {
 	callerID := createTestUser(t, authStore, "access-admin", "admin")
 	createTestUser(t, authStore, "access-mike", "user")
 
-	handler := NewAdminHandler(accessStore, authStore)
+	handler := NewAdminHandler(accessStore, authStore, nil)
 	body := `{"username":"access-mike","password":"s3cret-pass","role":"user"}`
 	rec := performCreateUser(t, handler, callerID, "admin", body)
 
@@ -287,7 +300,7 @@ func TestAdminHandler_CreateUser_UnknownRoleRejected(t *testing.T) {
 	accessStore, authStore := setupAccessStore(t)
 	callerID := createTestUser(t, authStore, "access-admin", "admin")
 
-	handler := NewAdminHandler(accessStore, authStore)
+	handler := NewAdminHandler(accessStore, authStore, nil)
 	body := `{"username":"access-newbie","password":"s3cret-pass","role":"superuser"}`
 	rec := performCreateUser(t, handler, callerID, "admin", body)
 
@@ -300,7 +313,7 @@ func TestAdminHandler_CreateUser_EmptyPasswordRejected(t *testing.T) {
 	accessStore, authStore := setupAccessStore(t)
 	callerID := createTestUser(t, authStore, "access-admin", "admin")
 
-	handler := NewAdminHandler(accessStore, authStore)
+	handler := NewAdminHandler(accessStore, authStore, nil)
 	body := `{"username":"access-newbie","password":"","role":"user"}`
 	rec := performCreateUser(t, handler, callerID, "admin", body)
 
@@ -336,7 +349,7 @@ func TestAdminHandler_SetActive_DeactivatesUser(t *testing.T) {
 	callerID := createTestUser(t, authStore, "access-admin", "admin")
 	targetID := createTestUser(t, authStore, "access-mike", "user")
 
-	handler := NewAdminHandler(accessStore, authStore)
+	handler := NewAdminHandler(accessStore, authStore, nil)
 	rec := performSetActive(t, handler, callerID, targetID, "admin", `{"is_active":false}`)
 
 	if rec.Code != http.StatusNoContent {
@@ -357,7 +370,7 @@ func TestAdminHandler_SetActive_SelfDeactivateRejected(t *testing.T) {
 	ctx := context.Background()
 	callerID := createTestUser(t, authStore, "access-admin", "admin")
 
-	handler := NewAdminHandler(accessStore, authStore)
+	handler := NewAdminHandler(accessStore, authStore, nil)
 	rec := performSetActive(t, handler, callerID, callerID, "admin", `{"is_active":false}`)
 
 	if rec.Code != http.StatusForbidden {
@@ -377,7 +390,7 @@ func TestAdminHandler_SetActive_UnknownUserIDRejected(t *testing.T) {
 	accessStore, authStore := setupAccessStore(t)
 	callerID := createTestUser(t, authStore, "access-admin", "admin")
 
-	handler := NewAdminHandler(accessStore, authStore)
+	handler := NewAdminHandler(accessStore, authStore, nil)
 	rec := performSetActive(t, handler, callerID, 999999999, "admin", `{"is_active":false}`)
 
 	if rec.Code != http.StatusNotFound {
@@ -391,7 +404,7 @@ func TestAdminHandler_ResetPassword_SetsNewPassword(t *testing.T) {
 	callerID := createTestUser(t, authStore, "access-admin", "admin")
 	targetID := createTestUser(t, authStore, "access-mike", "user")
 
-	handler := NewAdminHandler(accessStore, authStore)
+	handler := NewAdminHandler(accessStore, authStore, nil)
 	rec := performResetPassword(t, handler, callerID, targetID, "admin", `{"password":"new-s3cret"}`)
 
 	if rec.Code != http.StatusNoContent {
@@ -412,7 +425,7 @@ func TestAdminHandler_ResetPassword_EmptyPasswordRejected(t *testing.T) {
 	callerID := createTestUser(t, authStore, "access-admin", "admin")
 	targetID := createTestUser(t, authStore, "access-mike", "user")
 
-	handler := NewAdminHandler(accessStore, authStore)
+	handler := NewAdminHandler(accessStore, authStore, nil)
 	rec := performResetPassword(t, handler, callerID, targetID, "admin", `{"password":""}`)
 
 	if rec.Code != http.StatusBadRequest {
@@ -424,7 +437,7 @@ func TestAdminHandler_ResetPassword_UnknownUserIDRejected(t *testing.T) {
 	accessStore, authStore := setupAccessStore(t)
 	callerID := createTestUser(t, authStore, "access-admin", "admin")
 
-	handler := NewAdminHandler(accessStore, authStore)
+	handler := NewAdminHandler(accessStore, authStore, nil)
 	rec := performResetPassword(t, handler, callerID, 999999999, "admin", `{"password":"new-s3cret"}`)
 
 	if rec.Code != http.StatusNotFound {
@@ -515,7 +528,7 @@ func TestAdminHandler_GrantFeature_LogsAuditEntry(t *testing.T) {
 	callerID := createTestUser(t, authStore, "access-admin", "admin")
 	targetID := createTestUser(t, authStore, "access-mike", "user")
 
-	handler := NewAdminHandler(accessStore, authStore)
+	handler := NewAdminHandler(accessStore, authStore, nil)
 	rec := performGrantFeature(t, handler, callerID, targetID, "admin", "notes")
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
@@ -543,6 +556,37 @@ func TestAdminHandler_GrantFeature_LogsAuditEntry(t *testing.T) {
 	}
 }
 
+func TestAdminHandler_GrantFeature_BroadcastsAuditEntry(t *testing.T) {
+	accessStore, authStore := setupAccessStore(t)
+	callerID := createTestUser(t, authStore, "access-admin", "admin")
+	targetID := createTestUser(t, authStore, "access-mike", "user")
+
+	hub := &fakeBroadcaster{}
+	handler := NewAdminHandler(accessStore, authStore, hub)
+	rec := performGrantFeature(t, handler, callerID, targetID, "admin", "notes")
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	if len(hub.envelopes) != 1 {
+		t.Fatalf("expected 1 broadcast envelope, got %d", len(hub.envelopes))
+	}
+	env := hub.envelopes[0]
+	if env.Topic != "ops.audit" {
+		t.Fatalf("expected topic ops.audit, got %q", env.Topic)
+	}
+	if env.Type != realtime.MessageTypeUpdate {
+		t.Fatalf("expected type update, got %q", env.Type)
+	}
+	var entry auditEntryResponse
+	if err := json.Unmarshal(env.Payload, &entry); err != nil {
+		t.Fatalf("unmarshaling payload: %v", err)
+	}
+	if entry.ActorUsername != "access-admin" || entry.Action != "grant_feature" {
+		t.Fatalf("unexpected broadcast payload: %+v", entry)
+	}
+}
+
 func TestAdminHandler_RevokeFeature_LogsAuditEntry(t *testing.T) {
 	accessStore, authStore := setupAccessStore(t)
 	ctx := context.Background()
@@ -552,7 +596,7 @@ func TestAdminHandler_RevokeFeature_LogsAuditEntry(t *testing.T) {
 		t.Fatalf("Grant: %v", err)
 	}
 
-	handler := NewAdminHandler(accessStore, authStore)
+	handler := NewAdminHandler(accessStore, authStore, nil)
 	rec := performRevokeFeature(t, handler, callerID, targetID, "admin", "notes")
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
@@ -573,7 +617,7 @@ func TestAdminHandler_CreateUser_LogsAuditEntry(t *testing.T) {
 	ctx := context.Background()
 	callerID := createTestUser(t, authStore, "access-admin", "admin")
 
-	handler := NewAdminHandler(accessStore, authStore)
+	handler := NewAdminHandler(accessStore, authStore, nil)
 	rec := performCreateUser(t, handler, callerID, "admin", `{"username":"access-newbie","password":"s3cret-pass","role":"user"}`)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
@@ -598,7 +642,7 @@ func TestAdminHandler_SetActive_LogsAuditEntry(t *testing.T) {
 	callerID := createTestUser(t, authStore, "access-admin", "admin")
 	targetID := createTestUser(t, authStore, "access-mike", "user")
 
-	handler := NewAdminHandler(accessStore, authStore)
+	handler := NewAdminHandler(accessStore, authStore, nil)
 	rec := performSetActive(t, handler, callerID, targetID, "admin", `{"is_active":false}`)
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
@@ -620,7 +664,7 @@ func TestAdminHandler_ResetPassword_LogsAuditEntry(t *testing.T) {
 	callerID := createTestUser(t, authStore, "access-admin", "admin")
 	targetID := createTestUser(t, authStore, "access-mike", "user")
 
-	handler := NewAdminHandler(accessStore, authStore)
+	handler := NewAdminHandler(accessStore, authStore, nil)
 	rec := performResetPassword(t, handler, callerID, targetID, "admin", `{"password":"new-s3cret"}`)
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
@@ -645,7 +689,7 @@ func TestAdminHandler_UpdateRole_LogsAuditEntry(t *testing.T) {
 	callerID := createTestUser(t, authStore, "access-admin", "admin")
 	targetID := createTestUser(t, authStore, "access-mike", "user")
 
-	handler := NewAdminHandler(accessStore, authStore)
+	handler := NewAdminHandler(accessStore, authStore, nil)
 	rec := performUpdateRole(t, handler, callerID, targetID, "admin", `{"role":"admin"}`)
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
@@ -666,11 +710,11 @@ func TestAdminHandler_AuditLog_ReturnsEntries(t *testing.T) {
 	ctx := context.Background()
 	actorID := createTestUser(t, authStore, "access-admin", "admin")
 	targetID := createTestUser(t, authStore, "access-mike", "user")
-	if err := accessStore.LogAction(ctx, actorID, "grant_feature", &targetID, "feature=notes"); err != nil {
+	if _, err := accessStore.LogAction(ctx, actorID, "grant_feature", &targetID, "feature=notes"); err != nil {
 		t.Fatalf("LogAction: %v", err)
 	}
 
-	handler := NewAdminHandler(accessStore, authStore)
+	handler := NewAdminHandler(accessStore, authStore, nil)
 	req := httptest.NewRequest(http.MethodGet, "/api/admin/audit-log", nil)
 	rec := httptest.NewRecorder()
 	handler.AuditLog(rec, req)
@@ -707,7 +751,7 @@ func TestAdminHandler_UpdateRole_SelfChangeRejected(t *testing.T) {
 	ctx := context.Background()
 	callerID := createTestUser(t, authStore, "access-admin", "admin")
 
-	handler := NewAdminHandler(accessStore, authStore)
+	handler := NewAdminHandler(accessStore, authStore, nil)
 	rec := performUpdateRole(t, handler, callerID, callerID, "admin", `{"role":"user"}`)
 
 	if rec.Code != http.StatusForbidden {

@@ -158,6 +158,16 @@ func (h *Hub) Unsubscribe(c subscriber, topic string) {
 	}
 }
 
+// SubscriberCount reports how many connections are currently subscribed
+// to topic. Used by producers (e.g. internal/ops's HealthTicker) to skip
+// generating a message nobody's listening for — never used for authz or
+// routing, just a cheap "is anyone watching" check.
+func (h *Hub) SubscriberCount(topic string) int {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return len(h.subscribers[topic])
+}
+
 // Broadcast delivers env to every connection currently subscribed to
 // env.Topic. Copies the target list under the lock, then delivers
 // outside it — send() itself is non-blocking (bounded channel), so this

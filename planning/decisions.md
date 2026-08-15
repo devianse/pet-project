@@ -37,6 +37,7 @@ second copy.
 - ~~Postgres backup strategy~~ — see `history.md` step 18. One
   follow-up left open, see "Still open" below
   (`infra/deployment-runbook/` gitignore status).
+- ~~Ops panel live-update~~ — see `history.md` step 19.
 
 ## Still open
 
@@ -63,17 +64,6 @@ second copy.
   three unrelated domain schemas and is realistically its own
   multi-part effort, not a bolt-on.
 
-- **Ops panel live-update** — deferred out of the audit trail + ops
-  panel feature above. Today the health card and audit log only fetch
-  once on page mount, same as the rest of `/admin` — an action taken in
-  one tab (or by another admin) doesn't appear until the page is
-  reloaded. Long-polling was raised as a lighter-weight stopgap; the
-  real fix is likely the same WebSockets work already deferred below
-  for Date Night/Shopping List, since it'd be one more consumer of the
-  same cross-cutting real-time mechanism rather than a bespoke polling
-  loop just for this page. Worth deciding at WebSockets design time
-  rather than building a one-off now.
-
 - **Self-service email password reset** — deferred out of the user
   lifecycle management feature above, where the admin-triggered reset
   is landing as "admin sets a temp password, shown once" instead (no
@@ -99,8 +89,8 @@ second copy.
   Shell landed (2026-08-15) — see
   `docs/superpowers/specs/2026-08-15-websockets-shell-design.md` and
   `docs/superpowers/plans/2026-08-15-websockets-shell.md`. Ops panel
-  live-update (the deferred item above) is now unblocked as the first
-  real consumer — still not started.
+  live-update, its first real consumer, has since shipped too — see
+  `history.md` step 19.
 - **Auth rewrite to an OAuth library** — raised while brainstorming
   WebSockets auth (2026-08-15) as a "more secure" alternative to the
   current hand-rolled JWT/httpOnly-cookie auth (`backend/internal/auth`).
@@ -170,6 +160,19 @@ second copy.
   further (no advisory locks, no bespoke isolation abstraction).
   Once `notes` is user-scoped, the race disappears as a side effect of
   the ownership-scoped test convention above, and `-p 1` can go away.
+
+  Design done (2026-08-15), not yet implemented — see
+  `docs/superpowers/specs/2026-08-15-notes-per-person-design.md`.
+  `notes` gains a `user_id` column; `Store`/`Handler` methods take a
+  `userID` scoped from the auth cookie via the same `claims.UserID()`
+  pattern `internal/access` uses; existing rows are wiped (not
+  backfilled) since they predate ownership. Explicitly deferred out of
+  this design: cross-user (admin) visibility — staying strictly
+  private, no exceptions — and real Telegram chat→user linking, which
+  instead gets a fixed-owner interim (`TELEGRAM_NOTES_USER_ID` env
+  var) so the bot's `/notes`/`/newnote` commands keep working against
+  one account until per-chat linking is designed as its own future
+  item.
 - **`cmd/api/main.go` split** — raised while writing the WebSockets shell
   plan (2026-08-15): `main()` does everything in one ~200-line pass —
   reads env vars, constructs every store/handler, registers every route
