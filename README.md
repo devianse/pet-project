@@ -70,6 +70,8 @@ as needed.
 ```
 make build-backend    # go build ./...
 make build-frontend   # tsc -b && vite build
+make test-backend     # go test -p 1 ./...
+make test-frontend    # vitest run
 make lint-frontend    # oxlint
 make audit-frontend   # npm audit — known-vulnerability check on JS deps
 make audit-backend    # govulncheck ./... — known-vulnerability check on Go deps

@@ -1,4 +1,4 @@
-.PHONY: dev-backend dev-frontend build-backend build-frontend lint-frontend scan-secrets audit-frontend audit-backend test-backend redeploy
+.PHONY: dev-backend dev-frontend build-backend build-frontend lint-frontend scan-secrets audit-frontend audit-backend test-backend test-frontend redeploy
 
 dev-backend:
 	cd backend && go run ./cmd/api
@@ -20,6 +20,9 @@ test-backend:
 
 build-frontend:
 	cd frontend && npm run build
+
+test-frontend:
+	cd frontend && npm run test
 
 lint-frontend:
 	cd frontend && npm run lint

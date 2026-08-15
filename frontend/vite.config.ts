@@ -26,7 +26,10 @@ export default defineConfig(({ mode }) => {
       // to the Go backend, everything else is the SPA. Keeps dev and prod
       // routing behavior consistent instead of diverging.
       proxy: {
-        '/api': env.API_PROXY_TARGET || 'http://localhost:8080',
+        '/api': {
+          target: env.API_PROXY_TARGET || 'http://localhost:8080',
+          ws: true,
+        },
       },
     },
   }

@@ -9,10 +9,12 @@ type contextKey string
 
 const claimsContextKey contextKey = "auth_claims"
 
-// claimsFromRequest reads the session cookie off r and parses it into
-// Claims. Shared by Require and Me so the two paths that decide whether a
-// cookie is valid can't silently drift apart.
-func claimsFromRequest(r *http.Request, secret []byte) (*Claims, error) {
+// ClaimsFromRequest reads the session cookie off r and parses it into
+// Claims. Shared by Require and Me/UpdateMe so every path that decides
+// whether a cookie is valid can't silently drift apart. Exported so
+// package realtime (the WebSocket upgrade handshake) can reuse the same
+// cookie-validation logic REST already relies on, without duplicating it.
+func ClaimsFromRequest(r *http.Request, secret []byte) (*Claims, error) {
 	cookie, err := r.Cookie(cookieName)
 	if err != nil {
 		return nil, err
@@ -27,7 +29,7 @@ func claimsFromRequest(r *http.Request, secret []byte) (*Claims, error) {
 func Require(secret []byte) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			claims, err := claimsFromRequest(r, secret)
+			claims, err := ClaimsFromRequest(r, secret)
 			if err != nil {
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return

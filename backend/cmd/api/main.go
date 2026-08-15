@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -23,6 +24,7 @@ import (
 	"github.com/devianse/pet-project/backend/internal/datenight"
 	"github.com/devianse/pet-project/backend/internal/db"
 	"github.com/devianse/pet-project/backend/internal/notes"
+	"github.com/devianse/pet-project/backend/internal/realtime"
 	"github.com/devianse/pet-project/backend/internal/watchlist"
 	"github.com/joho/godotenv"
 )
@@ -112,6 +114,27 @@ func main() {
 		os.Exit(1)
 	}
 
+	// wsAuthenticator reuses the same session-cookie validation REST already
+	// uses — see realtime.Authenticator's doc comment for why this is a
+	// seam, not a hardcoded dependency.
+	wsAuthenticator := realtime.AuthenticatorFunc(func(r *http.Request) (realtime.Identity, error) {
+		claims, err := auth.ClaimsFromRequest(r, []byte(jwtSecret))
+		if err != nil {
+			return realtime.Identity{}, err
+		}
+		userID, err := claims.UserID()
+		if err != nil {
+			return realtime.Identity{}, err
+		}
+		return realtime.Identity{UserID: userID, Role: claims.Role}, nil
+	})
+
+	// realtimeHub has no real topics yet — AllowAuthenticated is the shell's
+	// default policy until the first consumer (Ops panel, per
+	// planning/decisions.md) wires a real per-topic TopicAuthorizer here.
+	realtimeHub := realtime.NewHub(realtime.AllowAuthenticated)
+	wsHandler := realtime.NewHandler(realtimeHub, wsAuthenticator)
+
 	authHandler := auth.NewHandler(authStore, []byte(jwtSecret), secureCookies, accessStore)
 	requireAuth := auth.Require([]byte(jwtSecret))
 	requireFeature := func(key string) func(http.Handler) http.Handler {
@@ -133,6 +156,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", handleHealth(conn))
+	mux.Handle("GET /api/ws", wsHandler)
 	mux.Handle("POST /api/auth/login", rateLimitMiddleware(loginLimiter, http.HandlerFunc(authHandler.Login)))
 	mux.HandleFunc("POST /api/auth/logout", authHandler.Logout)
 	mux.HandleFunc("GET /api/me", authHandler.Me)
@@ -192,9 +216,18 @@ func main() {
 		// Shutdown needs its own live deadline to bound the drain.
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
+
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			realtimeHub.Shutdown(shutdownCtx)
+		}()
+
 		if err := srv.Shutdown(shutdownCtx); err != nil {
 			logger.Error("graceful shutdown failed", "error", err)
 		}
+		wg.Wait()
 	}
 }
 
