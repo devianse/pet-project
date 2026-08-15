@@ -95,6 +95,12 @@ second copy.
   lifecycle, auth handshake, message protocol, hub/broadcast) — Ops
   panel is the first consumer but is being split into its own follow-up
   task rather than co-designed with the shell.
+
+  Shell landed (2026-08-15) — see
+  `docs/superpowers/specs/2026-08-15-websockets-shell-design.md` and
+  `docs/superpowers/plans/2026-08-15-websockets-shell.md`. Ops panel
+  live-update (the deferred item above) is now unblocked as the first
+  real consumer — still not started.
 - **Auth rewrite to an OAuth library** — raised while brainstorming
   WebSockets auth (2026-08-15) as a "more secure" alternative to the
   current hand-rolled JWT/httpOnly-cookie auth (`backend/internal/auth`).

@@ -24,7 +24,11 @@ as genuinely dependent on later phases, not skipped by oversight:
 - **CORS policy** — not needed yet (Caddy makes frontend/API
   same-origin), revisit if that changes
 - **CSP tightening** as the frontend grows past its current shape
-- **WebSocket auth** (phase 2 feature, doesn't exist yet)
+- ~~WebSocket auth~~ — done, see
+  `docs/superpowers/specs/2026-08-15-websockets-shell-design.md`. The
+  `GET /api/ws` upgrade reuses the same session-cookie validation as
+  REST via `realtime.Authenticator`; per-topic authorization goes
+  through `realtime.TopicAuthorizer` on every subscribe.
 - ~~Postgres backup strategy~~ — done, see
   `docs/superpowers/specs/2026-08-15-postgres-backup-design.md` and
   `docs/superpowers/plans/2026-08-15-postgres-backup.md` (manual
