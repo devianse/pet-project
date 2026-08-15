@@ -155,7 +155,7 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 // claims verbatim, so a display_name/role change since the token was
 // issued shows up immediately instead of only after the next login.
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
-	claims, err := claimsFromRequest(r, h.secret)
+	claims, err := ClaimsFromRequest(r, h.secret)
 	if err != nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -197,7 +197,7 @@ type updateMeRequest struct {
 // caller (the frontend's user menu), which always holds both fields in
 // state already.
 func (h *Handler) UpdateMe(w http.ResponseWriter, r *http.Request) {
-	claims, err := claimsFromRequest(r, h.secret)
+	claims, err := ClaimsFromRequest(r, h.secret)
 	if err != nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
