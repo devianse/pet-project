@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -24,6 +25,7 @@ import (
 	"github.com/devianse/pet-project/backend/internal/datenight"
 	"github.com/devianse/pet-project/backend/internal/db"
 	"github.com/devianse/pet-project/backend/internal/notes"
+	"github.com/devianse/pet-project/backend/internal/ops"
 	"github.com/devianse/pet-project/backend/internal/realtime"
 	"github.com/devianse/pet-project/backend/internal/watchlist"
 	"github.com/joho/godotenv"
@@ -129,11 +131,31 @@ func main() {
 		return realtime.Identity{UserID: userID, Role: claims.Role}, nil
 	})
 
-	// realtimeHub has no real topics yet — AllowAuthenticated is the shell's
-	// default policy until the first consumer (Ops panel, per
-	// planning/decisions.md) wires a real per-topic TopicAuthorizer here.
-	realtimeHub := realtime.NewHub(realtime.AllowAuthenticated)
+	// opsTopicAuthorizer is the first real per-topic policy: ops.* is
+	// admin-only (mirrors RequireRole(accessStore, "admin") REST already
+	// uses for /api/admin/...), everything else stays open to any
+	// authenticated identity until a future consumer needs its own rule.
+	opsTopicAuthorizer := realtime.TopicAuthorizerFunc(func(_ context.Context, identity realtime.Identity, topic string) bool {
+		if strings.HasPrefix(topic, "ops.") {
+			return identity.Role == "admin"
+		}
+		return true
+	})
+	realtimeHub := realtime.NewHub(opsTopicAuthorizer)
 	wsHandler := realtime.NewHandler(realtimeHub, wsAuthenticator)
+
+	// healthTicker is ops panel live-update's other half (audit log
+	// broadcasts from AdminHandler.logAction below) — only does DB work
+	// while someone's actually subscribed to ops.health, see
+	// internal/ops's own doc comment. Runs until ctx (SIGINT/SIGTERM) is
+	// cancelled, same lifecycle as the rest of this process's background
+	// work.
+	gitSHA := os.Getenv("GIT_SHA")
+	if gitSHA == "" {
+		gitSHA = "unknown"
+	}
+	healthTicker := ops.NewHealthTicker(conn, realtimeHub, gitSHA)
+	go healthTicker.Run(ctx)
 
 	authHandler := auth.NewHandler(authStore, []byte(jwtSecret), secureCookies, accessStore)
 	requireAuth := auth.Require([]byte(jwtSecret))
@@ -141,7 +163,7 @@ func main() {
 		return access.RequireFeature(accessStore, key)
 	}
 
-	adminHandler := access.NewAdminHandler(accessStore, authStore)
+	adminHandler := access.NewAdminHandler(accessStore, authStore, realtimeHub)
 	requireAdmin := func(h http.Handler) http.Handler {
 		return requireAuth(access.RequireRole(accessStore, "admin")(h))
 	}

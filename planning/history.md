@@ -396,3 +396,54 @@ matches `PLANNING.md`'s shell-first order one-for-one — see that file's
     `.local.md`-suffixed file, not revisited when it became a real
     multi-page directory (see "Still open" in `planning/decisions.md`
     if this hasn't been resolved by the time this is read).
+19. **Ops panel live-update** (done, on the `ops` branch, not yet
+    committed) — closes the deferred follow-up from step 13: the
+    `/admin` panel's health card and audit log now push updates over
+    the WebSockets shell instead of only fetching once on mount.
+    Bounded-path work (brainstormed, short in-chat design approved, no
+    spec doc) — the shell already existed; this is its first real
+    consumer. Backend: `realtime.Hub.SubscriberCount(topic)` (lets a
+    background producer skip work when nobody's listening); a new
+    `internal/ops` package with `HealthTicker` (functional-options
+    constructor matching `realtime.Hub`'s own pattern, `WithInterval`)
+    that ticks every 15s, skips the tick entirely if `ops.health` has
+    zero subscribers, otherwise pings the DB — bounded by its own 5s
+    `context.WithTimeout` derived from the ticker's long-lived run
+    context, not the run context directly — and broadcasts a
+    status/db/version payload; `access.Store.LogAction` now returns the
+    created `AuditEntry` (read back via a shared `auditEntryQuery`
+    constant + `scanAuditEntry` helper, also reused by `ListAuditLog`)
+    instead of just an error, and `access.AdminHandler` gained a
+    `broadcaster` interface (`Broadcast(realtime.Envelope)`, defined at
+    the consumer per the codebase's existing pattern, nil-safe so every
+    pre-existing test call site stays valid passing `nil`) so every
+    successful admin mutation broadcasts the new audit entry on
+    `ops.audit`. `cmd/api/main.go` wires an admin-only topic authorizer
+    for `ops.*`, constructs and runs the `HealthTicker` alongside the
+    server's other background goroutines, and passes the hub into
+    `NewAdminHandler`. Frontend: `features/admin/Page.tsx` subscribes to
+    both topics via the existing `useRealtimeTopic` hook, replacing
+    nothing about the mount-time fetch (still the initial load) but
+    updating state live as broadcasts arrive.
+
+    A `golang-design-patterns` review pass (explicitly requested)
+    surfaced one real finding on the first draft: `HealthTicker.tick`
+    was passing the long-lived `Run` context straight into
+    `PingContext`, so a hung DB connection could block indefinitely and
+    silently stall every future 15s broadcast. Fixed via TDD (a new
+    `TestHealthTicker_PingIsBoundedByItsOwnTimeout` watched RED via a
+    `fakePinger` that records whether the context it received carried a
+    deadline, then GREEN via the per-tick `context.WithTimeout`
+    described above) before the branch was considered review-clean. No
+    other findings — no `init()`/global state, resources already
+    bounded, options pattern already consistent with the rest of the
+    codebase.
+
+    Verified: full backend suite (`go test -p 1 ./...` against a real
+    Postgres) green except the pre-existing, unrelated
+    `TestHandler_Me_Features_Admin` failure in `internal/auth`
+    (confirmed via `git stash` to fail identically on unmodified code);
+    `gofmt -l .` / `go vet ./...` clean; frontend `tsc -b`, `oxlint`,
+    `vite build` all clean. Same accepted browser-click-through gap as
+    every other `/admin` change (steps 10-13): verified by test suite
+    and code review, not a rendered browser session.

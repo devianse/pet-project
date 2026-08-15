@@ -13,6 +13,7 @@ import (
 
 	"github.com/devianse/pet-project/backend/internal/auth"
 	"github.com/devianse/pet-project/backend/internal/platform"
+	"github.com/devianse/pet-project/backend/internal/realtime"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
@@ -29,6 +30,15 @@ type userLister interface {
 	SetPasswordHash(ctx context.Context, id int64, passwordHash string) (*auth.User, error)
 }
 
+// broadcaster is the one thing AdminHandler needs from *realtime.Hub —
+// same "define the interface at the consumer" pattern userLister already
+// uses. *realtime.Hub satisfies this structurally. A nil broadcaster is
+// valid (logAction skips broadcasting) — most existing tests don't care
+// about live-update and would otherwise all need a hub just to compile.
+type broadcaster interface {
+	Broadcast(env realtime.Envelope)
+}
+
 // AdminHandler serves the admin-only user/feature-grant management API
 // (GET/POST/DELETE /api/admin/users...). Gating is the route wiring's
 // job (RequireRole(accessStore, "admin") in cmd/api/main.go) — this
@@ -36,10 +46,11 @@ type userLister interface {
 type AdminHandler struct {
 	accessStore *Store
 	users       userLister
+	hub         broadcaster
 }
 
-func NewAdminHandler(accessStore *Store, users userLister) *AdminHandler {
-	return &AdminHandler{accessStore: accessStore, users: users}
+func NewAdminHandler(accessStore *Store, users userLister, hub broadcaster) *AdminHandler {
+	return &AdminHandler{accessStore: accessStore, users: users, hub: hub}
 }
 
 type adminUserResponse struct {
@@ -131,11 +142,30 @@ func (h *AdminHandler) actorFromClaims(w http.ResponseWriter, r *http.Request) (
 // logAction is a thin wrapper around accessStore.LogAction that only logs
 // the failure — an audit-write error shouldn't turn an otherwise-successful
 // admin action into a 500 for the caller, since the mutation itself already
-// committed.
+// committed. On success, also broadcasts the new entry on ops.audit (if a
+// hub was configured) so any admin panel with the page open sees it live
+// instead of on next reload.
 func (h *AdminHandler) logAction(ctx context.Context, actorID int64, action string, targetUserID *int64, detail string) {
-	if err := h.accessStore.LogAction(ctx, actorID, action, targetUserID, detail); err != nil {
+	entry, err := h.accessStore.LogAction(ctx, actorID, action, targetUserID, detail)
+	if err != nil {
 		slog.Error("log audit action", "action", action, "actor_id", actorID, "error", err)
+		return
 	}
+	if h.hub == nil {
+		return
+	}
+	payload, err := json.Marshal(auditEntryResponse{
+		ActorUsername:  entry.ActorUsername,
+		Action:         entry.Action,
+		TargetUsername: entry.TargetUsername,
+		Detail:         entry.Detail,
+		CreatedAt:      entry.CreatedAt.Format(time.RFC3339),
+	})
+	if err != nil {
+		slog.Error("marshal audit broadcast payload", "action", action, "error", err)
+		return
+	}
+	h.hub.Broadcast(realtime.Envelope{Topic: "ops.audit", Type: realtime.MessageTypeUpdate, Payload: payload})
 }
 
 type auditEntryResponse struct {

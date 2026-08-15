@@ -212,7 +212,7 @@ func TestLogActionAndListAuditLog(t *testing.T) {
 	actorID := createTestUser(t, authStore, "access-admin", "admin")
 	targetID := createTestUser(t, authStore, "access-mike", "user")
 
-	if err := store.LogAction(ctx, actorID, "update_role", &targetID, "role: user -> admin"); err != nil {
+	if _, err := store.LogAction(ctx, actorID, "update_role", &targetID, "role: user -> admin"); err != nil {
 		t.Fatalf("LogAction: %v", err)
 	}
 
@@ -247,12 +247,42 @@ func TestLogActionAndListAuditLog(t *testing.T) {
 	}
 }
 
+func TestLogAction_ReturnsCreatedEntry(t *testing.T) {
+	store, authStore := setupAccessStore(t)
+	ctx := context.Background()
+	actorID := createTestUser(t, authStore, "access-admin", "admin")
+	targetID := createTestUser(t, authStore, "access-mike", "user")
+
+	entry, err := store.LogAction(ctx, actorID, "update_role", &targetID, "role: user -> admin")
+	if err != nil {
+		t.Fatalf("LogAction: %v", err)
+	}
+	if entry.ActorUsername != "access-admin" {
+		t.Fatalf("expected actor username access-admin, got %q", entry.ActorUsername)
+	}
+	if entry.Action != "update_role" {
+		t.Fatalf("expected action update_role, got %q", entry.Action)
+	}
+	if entry.TargetUsername == nil || *entry.TargetUsername != "access-mike" {
+		t.Fatalf("expected target username access-mike, got %v", entry.TargetUsername)
+	}
+	if entry.Detail != "role: user -> admin" {
+		t.Fatalf("expected detail %q, got %q", "role: user -> admin", entry.Detail)
+	}
+	if entry.CreatedAt.IsZero() {
+		t.Fatal("expected non-zero CreatedAt")
+	}
+	if entry.ID == 0 {
+		t.Fatal("expected non-zero ID")
+	}
+}
+
 func TestLogAction_TargetUserOptional(t *testing.T) {
 	store, authStore := setupAccessStore(t)
 	ctx := context.Background()
 	actorID := createTestUser(t, authStore, "access-admin", "admin")
 
-	if err := store.LogAction(ctx, actorID, "create_user", nil, "username=access-newbie"); err != nil {
+	if _, err := store.LogAction(ctx, actorID, "create_user", nil, "username=access-newbie"); err != nil {
 		t.Fatalf("LogAction: %v", err)
 	}
 
@@ -276,10 +306,10 @@ func TestListAuditLog_NewestFirst(t *testing.T) {
 	ctx := context.Background()
 	actorID := createTestUser(t, authStore, "access-admin", "admin")
 
-	if err := store.LogAction(ctx, actorID, "grant_feature", nil, "feature=notes"); err != nil {
+	if _, err := store.LogAction(ctx, actorID, "grant_feature", nil, "feature=notes"); err != nil {
 		t.Fatalf("first LogAction: %v", err)
 	}
-	if err := store.LogAction(ctx, actorID, "revoke_feature", nil, "feature=notes"); err != nil {
+	if _, err := store.LogAction(ctx, actorID, "revoke_feature", nil, "feature=notes"); err != nil {
 		t.Fatalf("second LogAction: %v", err)
 	}
 

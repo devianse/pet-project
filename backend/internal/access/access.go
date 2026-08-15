@@ -75,28 +75,50 @@ type AuditEntry struct {
 	CreatedAt      time.Time
 }
 
-// LogAction records one admin action. targetUserID is nil for actions with
+// auditEntryQuery is the join every audit-entry read uses — ListAuditLog's
+// bulk read and LogAction's single-row read-back after insert share it, so
+// the two can't drift into reporting different fields for the same row
+// (same reasoning as AdminHandler.toResponse's shared-shape comment).
+const auditEntryQuery = `
+	SELECT l.id, actor.username, l.action, target.username, l.detail, l.created_at
+	FROM admin_audit_log l
+	JOIN users actor ON actor.id = l.actor_id
+	LEFT JOIN users target ON target.id = l.target_user_id
+`
+
+func scanAuditEntry(row *sql.Row) (AuditEntry, error) {
+	var e AuditEntry
+	err := row.Scan(&e.ID, &e.ActorUsername, &e.Action, &e.TargetUsername, &e.Detail, &e.CreatedAt)
+	return e, err
+}
+
+// LogAction records one admin action and returns the created entry (joined
+// with actor/target usernames, same shape ListAuditLog returns) so callers
+// — AdminHandler, to broadcast it over ops.audit — don't need a second
+// query to get displayable data back. targetUserID is nil for actions with
 // no single target (e.g. create_user, where the newly created user *is*
 // the subject but recording it as target_user_id would be redundant with
 // what's already in detail — kept nil-able for actions like a future
 // bulk operation that has no single target at all).
-func (s *Store) LogAction(ctx context.Context, actorID int64, action string, targetUserID *int64, detail string) error {
-	_, err := s.conn.ExecContext(ctx, `
+func (s *Store) LogAction(ctx context.Context, actorID int64, action string, targetUserID *int64, detail string) (AuditEntry, error) {
+	var id int64
+	err := s.conn.QueryRowContext(ctx, `
 		INSERT INTO admin_audit_log (actor_id, action, target_user_id, detail)
 		VALUES ($1, $2, $3, $4)
-	`, actorID, action, targetUserID, detail)
-	return err
+		RETURNING id
+	`, actorID, action, targetUserID, detail).Scan(&id)
+	if err != nil {
+		return AuditEntry{}, err
+	}
+	row := s.conn.QueryRowContext(ctx, auditEntryQuery+` WHERE l.id = $1`, id)
+	return scanAuditEntry(row)
 }
 
 // ListAuditLog returns the most recent 100 audit entries, newest first —
 // far more than this app's admin-action volume needs, so a hard limit
 // keeps the query trivial without a pagination UI.
 func (s *Store) ListAuditLog(ctx context.Context) ([]AuditEntry, error) {
-	rows, err := s.conn.QueryContext(ctx, `
-		SELECT l.id, actor.username, l.action, target.username, l.detail, l.created_at
-		FROM admin_audit_log l
-		JOIN users actor ON actor.id = l.actor_id
-		LEFT JOIN users target ON target.id = l.target_user_id
+	rows, err := s.conn.QueryContext(ctx, auditEntryQuery+`
 		ORDER BY l.created_at DESC, l.id DESC
 		LIMIT 100
 	`)

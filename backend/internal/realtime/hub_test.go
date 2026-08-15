@@ -11,12 +11,12 @@ import (
 // observe what the Hub does: envelopes it was sent and whether/why it
 // was told to close.
 type fakeConn struct {
-	connID     string
-	uid        int64
-	mu         sync.Mutex
-	received   []Envelope
-	full       bool // when true, send() always reports the buffer as full
-	closed     bool
+	connID      string
+	uid         int64
+	mu          sync.Mutex
+	received    []Envelope
+	full        bool // when true, send() always reports the buffer as full
+	closed      bool
 	closeReason string
 }
 
@@ -137,6 +137,33 @@ func TestHub_UnregisterCleansUpSubscriptions(t *testing.T) {
 	}
 	if c.closed {
 		t.Fatal("Unregister itself should not close the connection — the caller already knows it's gone")
+	}
+}
+
+func TestHub_SubscriberCount(t *testing.T) {
+	h := NewHub(AllowAuthenticated)
+	c1 := &fakeConn{connID: "c1", uid: 1}
+	c2 := &fakeConn{connID: "c2", uid: 2}
+	_ = h.Register(c1)
+	_ = h.Register(c2)
+
+	if got := h.SubscriberCount("ops.health"); got != 0 {
+		t.Fatalf("expected 0 subscribers before any Subscribe, got %d", got)
+	}
+
+	h.Subscribe(context.Background(), c1, Identity{UserID: 1}, "ops.health")
+	if got := h.SubscriberCount("ops.health"); got != 1 {
+		t.Fatalf("expected 1 subscriber, got %d", got)
+	}
+
+	h.Subscribe(context.Background(), c2, Identity{UserID: 2}, "ops.health")
+	if got := h.SubscriberCount("ops.health"); got != 2 {
+		t.Fatalf("expected 2 subscribers, got %d", got)
+	}
+
+	h.Unsubscribe(c1, "ops.health")
+	if got := h.SubscriberCount("ops.health"); got != 1 {
+		t.Fatalf("expected 1 subscriber after Unsubscribe, got %d", got)
 	}
 }
 
