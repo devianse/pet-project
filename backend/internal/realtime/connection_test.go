@@ -25,7 +25,7 @@ func echoServer(t *testing.T) (*httptest.Server, *Hub) {
 			return
 		}
 		conn := newConnection(newConnID(), 1, ws)
-		if err := hub.Register(conn, 1); err != nil {
+		if err := hub.Register(conn); err != nil {
 			t.Errorf("Register: %v", err)
 			return
 		}
@@ -33,7 +33,7 @@ func echoServer(t *testing.T) (*httptest.Server, *Hub) {
 		defer cancel()
 		go conn.writePump(ctx)
 		conn.readPump(ctx, hub, Identity{UserID: 1, Role: "user"})
-		hub.Unregister(conn, 1)
+		hub.Unregister(conn)
 	}))
 	t.Cleanup(srv.Close)
 	return srv, hub

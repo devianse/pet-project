@@ -46,13 +46,13 @@ func TestHub_RegisterEnforcesMaxConnsPerUser(t *testing.T) {
 	c2 := &fakeConn{connID: "c2", uid: 42}
 	c3 := &fakeConn{connID: "c3", uid: 42}
 
-	if err := h.Register(c1, 42); err != nil {
+	if err := h.Register(c1); err != nil {
 		t.Fatalf("Register c1: %v", err)
 	}
-	if err := h.Register(c2, 42); err != nil {
+	if err := h.Register(c2); err != nil {
 		t.Fatalf("Register c2: %v", err)
 	}
-	if err := h.Register(c3, 42); err != ErrTooManyConnections {
+	if err := h.Register(c3); err != ErrTooManyConnections {
 		t.Fatalf("Register c3: expected ErrTooManyConnections, got %v", err)
 	}
 }
@@ -62,11 +62,11 @@ func TestHub_UnregisterFreesUpUserSlot(t *testing.T) {
 	c1 := &fakeConn{connID: "c1", uid: 42}
 	c2 := &fakeConn{connID: "c2", uid: 42}
 
-	if err := h.Register(c1, 42); err != nil {
+	if err := h.Register(c1); err != nil {
 		t.Fatalf("Register c1: %v", err)
 	}
-	h.Unregister(c1, 42)
-	if err := h.Register(c2, 42); err != nil {
+	h.Unregister(c1)
+	if err := h.Register(c2); err != nil {
 		t.Fatalf("Register c2 after unregister: %v", err)
 	}
 }
@@ -77,7 +77,7 @@ func TestHub_SubscribeRespectsAuthorizer(t *testing.T) {
 	})
 	h := NewHub(deny)
 	c := &fakeConn{connID: "c1", uid: 1}
-	_ = h.Register(c, 1)
+	_ = h.Register(c)
 
 	if h.Subscribe(context.Background(), c, Identity{Role: "user"}, "ops.health") {
 		t.Fatal("expected non-admin subscribe to be rejected")
@@ -91,8 +91,8 @@ func TestHub_BroadcastDeliversOnlyToSubscribers(t *testing.T) {
 	h := NewHub(AllowAuthenticated)
 	subscribed := &fakeConn{connID: "c1", uid: 1}
 	notSubscribed := &fakeConn{connID: "c2", uid: 2}
-	_ = h.Register(subscribed, 1)
-	_ = h.Register(notSubscribed, 2)
+	_ = h.Register(subscribed)
+	_ = h.Register(notSubscribed)
 	h.Subscribe(context.Background(), subscribed, Identity{UserID: 1}, "ops.health")
 
 	env := Envelope{Topic: "ops.health", Type: MessageTypeUpdate}
@@ -109,7 +109,7 @@ func TestHub_BroadcastDeliversOnlyToSubscribers(t *testing.T) {
 func TestHub_BroadcastClosesFullBufferSubscriber(t *testing.T) {
 	h := NewHub(AllowAuthenticated)
 	c := &fakeConn{connID: "c1", uid: 1, full: true}
-	_ = h.Register(c, 1)
+	_ = h.Register(c)
 	h.Subscribe(context.Background(), c, Identity{UserID: 1}, "ops.health")
 
 	h.Broadcast(Envelope{Topic: "ops.health", Type: MessageTypeUpdate})
@@ -122,15 +122,15 @@ func TestHub_BroadcastClosesFullBufferSubscriber(t *testing.T) {
 func TestHub_UnregisterCleansUpSubscriptions(t *testing.T) {
 	h := NewHub(AllowAuthenticated)
 	c := &fakeConn{connID: "c1", uid: 1}
-	_ = h.Register(c, 1)
+	_ = h.Register(c)
 	h.Subscribe(context.Background(), c, Identity{UserID: 1}, "ops.health")
-	h.Unregister(c, 1)
+	h.Unregister(c)
 
 	// A fresh connection subscribing to the same topic should not somehow
 	// observe stale state from c — broadcasting shouldn't panic or try to
 	// deliver to the unregistered connection.
 	fresh := &fakeConn{connID: "c2", uid: 1}
-	_ = h.Register(fresh, 1)
+	_ = h.Register(fresh)
 	h.Broadcast(Envelope{Topic: "ops.health", Type: MessageTypeUpdate})
 	if len(fresh.received) != 0 {
 		t.Fatalf("fresh unsubscribed conn should not receive broadcast, got %+v", fresh.received)
@@ -166,8 +166,8 @@ func TestHub_ShutdownClosesAllConnectionsWithinTimeout(t *testing.T) {
 	h := NewHub(AllowAuthenticated, WithShutdownTimeout(200*time.Millisecond))
 	c1 := &fakeConn{connID: "c1", uid: 1}
 	c2 := &fakeConn{connID: "c2", uid: 2}
-	_ = h.Register(c1, 1)
-	_ = h.Register(c2, 2)
+	_ = h.Register(c1)
+	_ = h.Register(c2)
 
 	start := time.Now()
 	h.Shutdown(context.Background())

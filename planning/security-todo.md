@@ -29,6 +29,17 @@ as genuinely dependent on later phases, not skipped by oversight:
   `GET /api/ws` upgrade reuses the same session-cookie validation as
   REST via `realtime.Authenticator`; per-topic authorization goes
   through `realtime.TopicAuthorizer` on every subscribe.
+- **WebSocket identity not re-validated for connection lifetime** — a
+  connection's `Identity` is captured once at accept time
+  (`backend/internal/realtime/handler.go`'s `ServeHTTP`) and never
+  re-checked against token expiry, logout, or a role change for as long
+  as the socket stays open (session cookies live 14 days), even though
+  per-topic authorization does re-check on every subscribe. Not
+  exploitable today (no role-gated topics exist), but must be resolved
+  before the first one ships — see the "Known limitation" note in
+  `docs/superpowers/specs/2026-08-15-websockets-shell-design.md`'s
+  Security section for the fix options (periodic re-check via
+  `pingLoop`, or close-on-logout/expiry).
 - ~~Postgres backup strategy~~ — done, see
   `docs/superpowers/specs/2026-08-15-postgres-backup-design.md` and
   `docs/superpowers/plans/2026-08-15-postgres-backup.md` (manual

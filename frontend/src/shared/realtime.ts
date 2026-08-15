@@ -54,9 +54,21 @@ export class RealtimeClient {
       }
     }
     ws.onmessage = (ev: MessageEvent) => {
-      const env = JSON.parse(ev.data as string) as Envelope
+      let env: Envelope
+      try {
+        env = JSON.parse(ev.data as string) as Envelope
+      } catch (err) {
+        console.error('realtime: failed to parse incoming message', err)
+        return
+      }
       const handlers = this.topics.get(env.topic)
-      handlers?.forEach((h) => h(env))
+      handlers?.forEach((h) => {
+        try {
+          h(env)
+        } catch (err) {
+          console.error('realtime: handler threw for topic', env.topic, err)
+        }
+      })
     }
     ws.onclose = () => {
       if (!this.closedByUser) {

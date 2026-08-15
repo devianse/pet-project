@@ -87,17 +87,17 @@ func NewHub(authorizer TopicAuthorizer, opts ...Option) *Hub {
 }
 
 // Register adds c to the registry, rejecting it with ErrTooManyConnections
-// if userID already has maxConnsPerUser open connections — a defensive
+// if c.userID() already has maxConnsPerUser open connections — a defensive
 // cap so a reconnect-loop bug (frontend or otherwise) can't grow the
 // process's connection count without bound.
-func (h *Hub) Register(c subscriber, userID int64) error {
+func (h *Hub) Register(c subscriber) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if h.byUser[userID] >= h.maxConnsPerUser {
+	if h.byUser[c.userID()] >= h.maxConnsPerUser {
 		return ErrTooManyConnections
 	}
 	h.conns[c.id()] = c
-	h.byUser[userID]++
+	h.byUser[c.userID()]++
 	return nil
 }
 
@@ -105,13 +105,19 @@ func (h *Hub) Register(c subscriber, userID int64) error {
 // c — by the time a caller unregisters, it already knows the connection
 // is gone (this is called from the same code path that observed the
 // socket close), so closing again here would be redundant.
-func (h *Hub) Unregister(c subscriber, userID int64) {
+//
+// A no-op if c was never registered (or already unregistered) — guards
+// against a spurious or duplicate call corrupting byUser's count.
+func (h *Hub) Unregister(c subscriber) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	if _, ok := h.conns[c.id()]; !ok {
+		return
+	}
 	delete(h.conns, c.id())
-	h.byUser[userID]--
-	if h.byUser[userID] <= 0 {
-		delete(h.byUser, userID)
+	h.byUser[c.userID()]--
+	if h.byUser[c.userID()] <= 0 {
+		delete(h.byUser, c.userID())
 	}
 	for topic, ids := range h.subscribers {
 		delete(ids, c.id())

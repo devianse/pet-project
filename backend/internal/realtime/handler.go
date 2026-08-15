@@ -70,11 +70,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer ws.CloseNow()
 
 	conn := newConnection(newConnID(), identity.UserID, ws)
-	if err := h.hub.Register(conn, identity.UserID); err != nil {
+	if err := h.hub.Register(conn); err != nil {
 		_ = ws.Close(websocket.StatusPolicyViolation, err.Error())
 		return
 	}
-	defer h.hub.Unregister(conn, identity.UserID)
+	defer h.hub.Unregister(conn)
 
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()

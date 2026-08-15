@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -91,6 +92,7 @@ func (c *connection) writePump(ctx context.Context) {
 		case env := <-c.outbound:
 			data, err := json.Marshal(env)
 			if err != nil {
+				slog.Warn("realtime: failed to marshal outbound envelope", "conn_id", c.connID, "error", err)
 				continue // a malformed envelope shouldn't kill the connection
 			}
 			writeCtx, cancel := context.WithTimeout(ctx, defaultWriteTimeout)
