@@ -57,8 +57,8 @@ as needed.
 - `backend/.env.example` — `PORT` the Go server listens on,
   `TMDB_READ_ACCESS_TOKEN` for the Watchlist feature's TMDb API calls.
   Per-user feature access (Notes, Watchlist, Date Night, etc.) is granted
-  via `cmd/grantaccess`, not an env var — `admin` accounts bypass gating
-  automatically.
+  through the admin panel (`/admin`), not an env var — `admin` accounts
+  bypass gating automatically.
 - `frontend/.env.example` — `API_PROXY_TARGET` (where Vite's dev proxy
   forwards `/api` requests) and `FRONTEND_PORT` (what port Vite itself
   runs on, default 3000)
@@ -139,19 +139,18 @@ alongside `api`, no Go toolchain needed inside the container.
 New non-admin accounts start with **zero feature grants** — `admin`
 accounts bypass gating automatically, but a `user`-role account can't
 see Notes, Watchlist, or Date Night until granted. Grant per feature
-with `cmd/grantaccess` (same pattern as `createuser`, and shipped in
-the runtime image alongside it):
-
-```bash
-go run ./cmd/grantaccess -username=<name> -grant=<feature>   # or -revoke=<feature>
-go run ./cmd/grantaccess -username=<name> -list              # see current grants
-```
-
-against the deployed database: `docker compose exec backend
-grantaccess -username=<name> -grant=<feature>`. Valid `<feature>`
-values are `notes`, `watchlist`, `date-night`, `shopping-list`,
-`image-processing` (see `backend/internal/access/features.go`'s
-`KnownFeatures` for the source of truth). This is a required step
-right after seeding a non-admin account — see
+through the admin panel (`/admin`, requires logging in as an `admin`
+account first): the users list there shows each account's resolved
+grants and lets you toggle any of `notes`, `watchlist`, `date-night`,
+`shopping-list`, `image-processing` (see
+`backend/internal/access/features.go`'s `KnownFeatures` for the source
+of truth). This is a required step right after seeding a non-admin
+account — see
 `docs/superpowers/specs/2026-08-13-feature-visibility-design.md` for
 the full design.
+
+(There used to be a `cmd/grantaccess` CLI for this — removed once the
+admin panel covered the same grant/revoke/list operations with less
+friction and an audit trail the CLI never had. `cmd/createuser` stays,
+since it's the only way to seed the very first admin account before
+any admin session exists to use the panel with.)

@@ -108,10 +108,8 @@ func (h *AdminHandler) toResponse(ctx context.Context, u *auth.User) (adminUserR
 	}, nil
 }
 
-// knownFeatureKeysCSV mirrors cmd/grantaccess's knownFeatureKeys helper.
-// Duplicated rather than shared: one lives in package main, the other in
-// package access, and it's three lines — not worth an exported helper
-// for two call sites across a package boundary.
+// knownFeatureKeysCSV renders KnownFeatures as a comma-joined string for
+// error messages, e.g. "notes, watchlist, date-night".
 func knownFeatureKeysCSV() string {
 	keys := make([]string, len(KnownFeatures))
 	for i, f := range KnownFeatures {
@@ -216,7 +214,7 @@ func (h *AdminHandler) requireExistingUser(w http.ResponseWriter, r *http.Reques
 }
 
 // GrantFeature grants the {key} feature to user {id}. Idempotent, like
-// accessStore.Grant and cmd/grantaccess's -grant flag.
+// accessStore.Grant.
 func (h *AdminHandler) GrantFeature(w http.ResponseWriter, r *http.Request) {
 	userID, ok := platform.IDParam(r)
 	if !ok {

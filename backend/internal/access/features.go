@@ -24,7 +24,7 @@ var KnownFeatures = []Feature{
 
 // IsKnownFeature reports whether key is one of KnownFeatures — used to
 // reject an invalid key with a clear error before it ever reaches the DB
-// (grantaccess's -grant/-revoke validation).
+// (AdminHandler.GrantFeature/RevokeFeature's validation).
 func IsKnownFeature(key string) bool {
 	for _, f := range KnownFeatures {
 		if f.Key == key {

@@ -39,7 +39,7 @@ prune_old_backups() {
 
 # Runs a shell command inside the VPS's running postgres container,
 # over SSH, via the existing docker-compose service (same pattern the
-# deploy runbook already uses for createuser/grantaccess).
+# deploy runbook already uses for createuser).
 remote_exec() {
   local vps_host="$1" remote_cmd="$2"
   ssh "$vps_host" "cd ~/pet-project/infra && docker compose exec -T postgres sh -c '$remote_cmd'"
