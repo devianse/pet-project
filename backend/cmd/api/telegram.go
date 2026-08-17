@@ -5,11 +5,14 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/devianse/pet-project/backend/internal/notes"
+	"github.com/devianse/pet-project/backend/internal/reminders"
 	"github.com/devianse/pet-project/backend/internal/telegram"
 )
 
@@ -145,5 +148,47 @@ func notesNewCommand(store *notes.Store) telegram.CommandFunc {
 			return "", err
 		}
 		return "note added", nil
+	}
+}
+
+// remindersUpcomingCommand replies with every pending reminder, soonest
+// due first, or a placeholder if none are pending. Reuses
+// reminders.Store.ListPending — the same read path the delivery ticker
+// uses, called directly rather than through an HTTP round-trip since both
+// live in the same process.
+func remindersUpcomingCommand(store *reminders.Store) telegram.CommandFunc {
+	return func(ctx context.Context, _ string) (string, error) {
+		pending, err := store.ListPending(ctx)
+		if err != nil {
+			return "", err
+		}
+		if len(pending) == 0 {
+			return "nothing upcoming", nil
+		}
+		now := time.Now()
+		lines := make([]string, len(pending))
+		for i, r := range pending {
+			lines[i] = fmt.Sprintf("- %s — %s", r.Message, humanRelative(now, r.DueAt))
+		}
+		return "📌 Upcoming\n" + joinCapped(lines, maxReplyChars), nil
+	}
+}
+
+// humanRelative renders how far due is from now in day-granularity terms
+// ("in 2 days (Aug 19)"), with "today"/"overdue" at the boundaries. now is
+// an explicit parameter (rather than calling time.Now() internally) so
+// this stays deterministically testable.
+func humanRelative(now, due time.Time) string {
+	days := int(math.Floor(due.Sub(now).Hours() / 24))
+	date := due.Format("Jan 2")
+	switch {
+	case days < 0:
+		return fmt.Sprintf("overdue (%s)", date)
+	case days == 0:
+		return fmt.Sprintf("today (%s)", date)
+	case days == 1:
+		return fmt.Sprintf("in 1 day (%s)", date)
+	default:
+		return fmt.Sprintf("in %d days (%s)", days, date)
 	}
 }
