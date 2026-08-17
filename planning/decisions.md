@@ -39,6 +39,10 @@ second copy.
   (`infra/deployment-runbook/` gitignore status).
 - ~~Ops panel live-update~~ — see `history.md` step 19.
 - ~~Scheduled reminders capability~~ — see `history.md` step 20.
+- ~~`cmd/api/main.go` split~~ — see `history.md` step 21. `cmd/grantaccess`
+  removed in the same pass, once review turned up that it was fully
+  redundant with the admin panel (grant/revoke/list, all with an audit
+  trail the CLI never had).
 
 ## Still open
 
@@ -174,21 +178,6 @@ second copy.
   var) so the bot's `/notes`/`/newnote` commands keep working against
   one account until per-chat linking is designed as its own future
   item.
-- **`cmd/api/main.go` split** — raised while writing the WebSockets shell
-  plan (2026-08-15): `main()` does everything in one ~200-line pass —
-  reads env vars, constructs every store/handler, registers every route
-  on `mux`, starts the server — with no `buildMux(...)`/`newApp(...)`
-  function that returns the wired router as a value. Noticed because it
-  meant Task 7 of that plan couldn't hit `/api/ws` through a real router
-  in a test without a refactor bigger than that task needed, so it
-  didn't add one (relied on `internal/realtime`'s own handler tests
-  instead — see `docs/superpowers/plans/2026-08-15-websockets-shell.md`
-  Task 7). Not a current bug — every route's behavior is already tested
-  at the package level (`internal/auth`, `internal/access`, etc.), and
-  `main.go` wiring is trusted by inspection like the rest of that file.
-  Worth a real look once it grows past this point (each new feature adds
-  ~10-15 more lines of route registration) or the next time something
-  wants to test routing/wiring directly — no design yet.
 - **Subscriptions / finance tracker** (brainstormed 2026-08-17, not yet
   designed) — the concrete feature that prompted the (now-shipped)
   scheduled reminders capability, see `history.md` step 20: a list of

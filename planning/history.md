@@ -504,3 +504,51 @@ matches `PLANNING.md`'s shell-first order one-for-one — see that file's
     manual end-to-end smoke test against a real Telegram bot (send
     `/reminders`, confirm the hourly ticker actually delivers) needs a
     human with bot access and has not been run as of this entry.
+21. **`cmd/api/main.go` split, plus `cmd/grantaccess` removal** (done) —
+    the tech-debt item flagged while writing the WebSockets shell plan
+    (`decisions.md`, resolved here): `main()` did every piece of app
+    wiring inline (env vars, every store/handler construction, every
+    route registration, server start) with no seam a test could reach
+    without running the binary — the reason Task 7 of the WS shell plan
+    (`docs/superpowers/plans/2026-08-15-websockets-shell.md`) couldn't
+    exercise `/api/ws` through a real router. New `backend/cmd/api/app.go`
+    holds a `Config` struct (already-validated env-derived values) and
+    `newApp(conn *sql.DB, cfg Config) (*App, error)`, which does
+    everything `main()` used to do after opening the DB connection:
+    constructs every store, runs every `EnsureSchema`, builds every
+    handler, wires the realtime hub/authenticator/authorizer, and
+    registers every route. `App` bundles what `main()` still needs after
+    construction (`Mux`, `RealtimeHub`, `HealthTicker`, the login
+    limiter, `NotesStore`/`RemindersStore` for the Telegram bot) with a
+    separate `StartBackgroundWork(ctx)` method for its goroutines —
+    mirroring the existing constructor/lifecycle split every `Ticker` in
+    the codebase already uses. `main()` shrank to reading/validating env
+    vars, opening the DB, calling `newApp`, and driving startup/shutdown.
+    `handleHealth` moved to its own `health.go` alongside the existing
+    per-concern split (`server.go`, `ratelimit.go`, `telegram.go`). A new
+    `app_test.go` is the actual payoff: it builds a real `App` against a
+    test DB, serves `app.Mux` via `httptest.NewServer`, logs in for a
+    real session cookie through `/api/auth/login`, and dials `/api/ws`
+    with it — plus a companion test confirming the same route 401s
+    without one — closing the exact gap the WS shell plan flagged.
+
+    While scoping this, a review of `cmd/createuser` and `cmd/grantaccess`
+    (the only other `cmd/` binaries, both shipped in the same Docker
+    image) turned up that `cmd/grantaccess` (grant/revoke/list feature
+    access) had become fully redundant: `POST`/`DELETE
+    /api/admin/users/{id}/features/{key}` and `GET /api/admin/users`
+    cover the same operations through the admin panel, with an audit-log
+    entry (`AdminHandler.logAction`) the CLI never wrote. Removed
+    entirely — package, Dockerfile build/copy lines, and every doc
+    reference (`README.md`, `infra/backup.sh`, comments in
+    `internal/access`) updated to point at the admin panel instead.
+    `cmd/createuser` was kept as-is: it's the bootstrap path for the very
+    first admin account, needed precisely because the admin panel
+    requires an existing admin session to create anyone.
+
+    Verified: full backend suite (`go test -p 1 ./...`, including the new
+    `cmd/api` tests) green against a real Postgres; `gofmt -l .` / `go
+    vet ./...` clean; `govulncheck ./...` and `gitleaks detect --source .
+    -v` both clean. No schema change, no new env vars, no behavior change
+    to any existing route — pure structural refactor plus one dead CLI
+    removed.

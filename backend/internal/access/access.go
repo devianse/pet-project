@@ -139,8 +139,7 @@ func (s *Store) ListAuditLog(ctx context.Context) ([]AuditEntry, error) {
 }
 
 // Grant is idempotent — granting an already-granted feature is a no-op,
-// not an error, so callers (the grantaccess CLI especially) don't need to
-// check first.
+// not an error, so callers don't need to check first.
 func (s *Store) Grant(ctx context.Context, userID int64, key string) error {
 	_, err := s.conn.ExecContext(ctx, `
 		INSERT INTO feature_access (user_id, feature_key) VALUES ($1, $2)
@@ -188,8 +187,8 @@ func (s *Store) ListForUser(ctx context.Context, userID int64) ([]string, error)
 	return keys, rows.Err()
 }
 
-// ListAllForUser is the resolved feature set for /api/me and the
-// grantaccess -list flag: admin gets every KnownFeatures key verbatim
+// ListAllForUser is the resolved feature set for /api/me and the admin
+// panel's users list: admin gets every KnownFeatures key verbatim
 // (bypassing the table entirely), everyone else gets their real grants.
 func (s *Store) ListAllForUser(ctx context.Context, userID int64, role string) ([]string, error) {
 	if role == "admin" {
