@@ -26,7 +26,7 @@ import (
 // SIGINT/SIGTERM), not context.Background() — the poller loop only
 // returns when its context is cancelled, so without this the goroutine
 // would outlive the rest of the server on every graceful shutdown.
-func startTelegramBot(ctx context.Context, logger *slog.Logger, notesStore *notes.Store) {
+func startTelegramBot(ctx context.Context, logger *slog.Logger, notesStore *notes.Store, remindersStore *reminders.Store) {
 	token := os.Getenv("TELEGRAM_BOT_TOKEN")
 	chatIDStr := os.Getenv("TELEGRAM_CHAT_ID")
 	if token == "" || chatIDStr == "" {
@@ -42,6 +42,7 @@ func startTelegramBot(ctx context.Context, logger *slog.Logger, notesStore *note
 	router := telegram.NewRouter()
 	router.Handle("/notes", "list all notes", notesListCommand(notesStore))
 	router.Handle("/newnote", "add a new note: /newnote <text>", notesNewCommand(notesStore))
+	router.Handle("/reminders", "list upcoming reminders", remindersUpcomingCommand(remindersStore))
 	router.Handle("/help", "list available commands", helpCommand(router))
 
 	client := telegram.NewRealClient(token)
@@ -56,6 +57,14 @@ func startTelegramBot(ctx context.Context, logger *slog.Logger, notesStore *note
 
 	poller := telegram.NewPoller(client, chatID, router)
 	go poller.Run(ctx)
+
+	// remindersTicker delivers scheduled reminders (see internal/reminders)
+	// via the same client/chat used for everything else this bot sends —
+	// gated on the same token/chatID check above since there's nowhere to
+	// deliver a reminder without them.
+	remindersTicker := reminders.NewTicker(remindersStore, client, chatID)
+	go remindersTicker.Run(ctx)
+
 	logger.Info("telegram bot poller started")
 }
 
