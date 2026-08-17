@@ -504,8 +504,9 @@ matches `PLANNING.md`'s shell-first order one-for-one — see that file's
     manual end-to-end smoke test against a real Telegram bot (send
     `/reminders`, confirm the hourly ticker actually delivers) needs a
     human with bot access and has not been run as of this entry.
-21. **`cmd/api/main.go` split, plus `cmd/grantaccess` removal** (done) —
-    the tech-debt item flagged while writing the WebSockets shell plan
+21. **`cmd/api/main.go` split, plus `cmd/grantaccess` removal** (done,
+    merged to `main` via the `refactor` branch, PR #24) — the tech-debt
+    item flagged while writing the WebSockets shell plan
     (`decisions.md`, resolved here): `main()` did every piece of app
     wiring inline (env vars, every store/handler construction, every
     route registration, server start) with no seam a test could reach
