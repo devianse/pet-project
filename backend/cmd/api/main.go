@@ -27,6 +27,7 @@ import (
 	"github.com/devianse/pet-project/backend/internal/notes"
 	"github.com/devianse/pet-project/backend/internal/ops"
 	"github.com/devianse/pet-project/backend/internal/realtime"
+	"github.com/devianse/pet-project/backend/internal/reminders"
 	"github.com/devianse/pet-project/backend/internal/watchlist"
 	"github.com/joho/godotenv"
 )
@@ -71,7 +72,14 @@ func main() {
 		os.Exit(1)
 	}
 	notesHandler := notes.NewHandler(notesStore)
-	startTelegramBot(ctx, logger, notesStore)
+
+	remindersStore := reminders.NewStore(conn)
+	if err := remindersStore.EnsureSchema(context.Background()); err != nil {
+		logger.Error("failed to ensure reminders schema", "error", err)
+		os.Exit(1)
+	}
+
+	startTelegramBot(ctx, logger, notesStore, remindersStore)
 
 	tmdbToken := os.Getenv("TMDB_READ_ACCESS_TOKEN")
 	if tmdbToken == "" {

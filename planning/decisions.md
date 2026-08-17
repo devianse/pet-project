@@ -38,6 +38,7 @@ second copy.
   follow-up left open, see "Still open" below
   (`infra/deployment-runbook/` gitignore status).
 - ~~Ops panel live-update~~ — see `history.md` step 19.
+- ~~Scheduled reminders capability~~ — see `history.md` step 20.
 
 ## Still open
 
@@ -188,6 +189,30 @@ second copy.
   Worth a real look once it grows past this point (each new feature adds
   ~10-15 more lines of route registration) or the next time something
   wants to test routing/wiring directly — no design yet.
+- **Subscriptions / finance tracker** (brainstormed 2026-08-17, not yet
+  designed) — the concrete feature that prompted the (now-shipped)
+  scheduled reminders capability, see `history.md` step 20: a list of
+  recurring/one-off financial obligations (subscriptions, bills, a VPS
+  balance running low) with cost and a due date, for two purposes —
+  visibility into recurring spend, and a Telegram nudge (via the
+  reminders capability) before something's due. Single shared owner
+  (just the operator), not per-user. Recurring entries: monthly/yearly
+  cadence only in v1 (no arbitrary N-day interval), auto-advance the
+  due date on schedule, with a pause/cancel that stops advancing but
+  keeps the row (soft-delete philosophy, matching ADR 0002). One-off
+  entries (no cadence) cover irregular cases like the VPS balance —
+  explicitly *not* solving general balance/burn-rate tracking; a
+  one-off reminder you manually recreate when you top up is judged
+  sufficient, real balance-tracking would be a much bigger separate
+  feature if it's ever needed. Needs its own brainstorm (schema, UI,
+  cost-summary view) — the reminders capability it builds against now
+  exists.
+- **"Personal assistant" platform vision** (raised 2026-08-17, not
+  scoped) — the long-term framing the reminders/tracker work sits
+  under: Telegram + APIs (e.g. pulling emails worth surfacing) as a
+  lightweight personal-assistant layer, explicitly *not* agentic
+  workflows. Far broader than any single feature above — noted here as
+  a future direction, not designed or committed to anywhere yet.
 - **Which of Shopping List / Image Processing** gets built first once
   phase 3 resumes, or whether they're built in parallel.
 - **OCR approach** (local Tesseract vs cloud API), if/when Image

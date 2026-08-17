@@ -6,9 +6,11 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/devianse/pet-project/backend/internal/db"
 	"github.com/devianse/pet-project/backend/internal/notes"
+	"github.com/devianse/pet-project/backend/internal/reminders"
 	"github.com/devianse/pet-project/backend/internal/telegram"
 )
 
@@ -157,5 +159,89 @@ func TestNotesNewCommand_BareCommandViaRouter(t *testing.T) {
 	reply := router.Dispatch(context.Background(), "/newnote")
 	if reply != "usage: /newnote <text>" {
 		t.Fatalf("bare /newnote should return usage message, got %q", reply)
+	}
+}
+
+// setupRemindersStore mirrors setupNotesStore — same skip-if-no-
+// DATABASE_URL convention.
+func setupRemindersStore(t *testing.T) *reminders.Store {
+	t.Helper()
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		t.Skip("DATABASE_URL not set, skipping test that needs a real Postgres instance")
+	}
+
+	conn, err := db.Open(dsn)
+	if err != nil {
+		t.Fatalf("opening db: %v", err)
+	}
+	t.Cleanup(func() { conn.Close() })
+
+	store := reminders.NewStore(conn)
+	if err := store.EnsureSchema(context.Background()); err != nil {
+		t.Fatalf("ensuring schema: %v", err)
+	}
+	if _, err := conn.ExecContext(context.Background(), "DELETE FROM reminders"); err != nil {
+		t.Fatalf("clearing reminders table: %v", err)
+	}
+	return store
+}
+
+func TestRemindersUpcomingCommand_EmptyStoreRepliesPlaceholder(t *testing.T) {
+	store := setupRemindersStore(t)
+	cmd := remindersUpcomingCommand(store)
+
+	reply, err := cmd(context.Background(), "")
+	if err != nil {
+		t.Fatalf("remindersUpcomingCommand: %v", err)
+	}
+	if reply != "nothing upcoming" {
+		t.Fatalf("expected placeholder reply, got %q", reply)
+	}
+}
+
+func TestRemindersUpcomingCommand_ListsPendingSoonestFirst(t *testing.T) {
+	store := setupRemindersStore(t)
+	ctx := context.Background()
+	now := time.Now()
+	if _, err := store.Schedule(ctx, "sub:later", "Grandpa's internet", now.Add(6*24*time.Hour)); err != nil {
+		t.Fatalf("seeding later reminder: %v", err)
+	}
+	if _, err := store.Schedule(ctx, "sub:sooner", "VPS balance top-up", now.Add(2*24*time.Hour)); err != nil {
+		t.Fatalf("seeding sooner reminder: %v", err)
+	}
+	cmd := remindersUpcomingCommand(store)
+
+	reply, err := cmd(ctx, "")
+	if err != nil {
+		t.Fatalf("remindersUpcomingCommand: %v", err)
+	}
+	if !strings.HasPrefix(reply, "📌 Upcoming\n- VPS balance top-up") {
+		t.Fatalf("expected VPS reminder listed first, got %q", reply)
+	}
+	if !strings.Contains(reply, "Grandpa's internet") {
+		t.Fatalf("expected both reminders listed, got %q", reply)
+	}
+}
+
+func TestHumanRelative(t *testing.T) {
+	now := time.Date(2026, time.August, 17, 12, 0, 0, 0, time.UTC)
+
+	cases := []struct {
+		name string
+		due  time.Time
+		want string
+	}{
+		{"two days out", now.Add(48 * time.Hour), "in 2 days (Aug 19)"},
+		{"one day out", now.Add(24 * time.Hour), "in 1 day (Aug 18)"},
+		{"due today", now, "today (Aug 17)"},
+		{"overdue", now.Add(-time.Hour), "overdue (Aug 17)"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := humanRelative(now, c.due); got != c.want {
+				t.Fatalf("humanRelative(%v, %v) = %q, want %q", now, c.due, got, c.want)
+			}
+		})
 	}
 }

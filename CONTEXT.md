@@ -89,3 +89,16 @@ on once a newer one exists.
 A `/`-prefixed instruction (e.g. `/notes`, `/newnote`) routed by prefix
 match to a handler. v1 is commands-in only, restricted to a single
 allowed chat ID.
+
+### Reminders
+
+**Reminder**:
+A scheduling primitive (`internal/reminders`) that fires one Telegram
+message at a future `due_at`, once — not a notification system. It
+knows nothing about *why* it was scheduled; a **source** is the owning
+feature's free-form identifier (e.g. `"subscription:42"`) that lets
+that feature find and `Cancel`/`Reschedule` its own reminder later
+without this package knowing that feature's schema. Cadence/recurrence
+is deliberately not a reminder concept — a consumer that wants a
+recurring nudge calls `Schedule` again for the next occurrence itself.
+See `docs/superpowers/specs/2026-08-17-reminders-design.md`.
