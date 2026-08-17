@@ -246,7 +246,7 @@ func TestHandler_Me_WithoutCookie(t *testing.T) {
 
 func TestHandler_Me_Features_Admin(t *testing.T) {
 	handler, store, features := newTestHandler(t)
-	_, err := store.CreateUser(context.Background(), "mike", "password123", "admin")
+	user, err := store.CreateUser(context.Background(), "mike", "password123", "admin")
 	if err != nil {
 		t.Fatalf("CreateUser: %v", err)
 	}
@@ -255,8 +255,13 @@ func TestHandler_Me_Features_Admin(t *testing.T) {
 	// (see backend/internal/access/features.go's doc comment). This test
 	// verifies Handler forwards whatever FeatureLister returns, not the
 	// real admin-bypass logic itself (that's Task 1's job).
-	features.features[1] = []string{"notes", "watchlist", "date-night", "shopping-list", "image-processing"}
-	token, err := SignToken([]byte("test-secret"), 1, "mike", "admin")
+	//
+	// user.ID (not a hardcoded 1) — CreateUser's ID comes from Postgres's
+	// serial sequence, which only starts at 1 against a freshly-seeded
+	// table; against a DB with prior rows it's whatever the sequence is
+	// at, so a hardcoded ID here made this test depend on run order.
+	features.features[user.ID] = []string{"notes", "watchlist", "date-night", "shopping-list", "image-processing"}
+	token, err := SignToken([]byte("test-secret"), user.ID, "mike", "admin")
 	if err != nil {
 		t.Fatalf("SignToken: %v", err)
 	}
