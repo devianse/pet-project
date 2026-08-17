@@ -7,7 +7,14 @@ import (
 	"time"
 )
 
-const defaultInterval = time.Hour
+const (
+	defaultInterval = time.Hour
+	// tickTimeout bounds each individual external call (ListPending,
+	// SendMessage, MarkSent) in tick — Run's own interval spaces ticks
+	// out, but this guards against a single call hanging and stalling
+	// the reminder loop indefinitely (see internal/ops/health.go's pattern).
+	tickTimeout = 5 * time.Second
+)
 
 // sender is the one thing Ticker needs from telegram.Client — same
 // "define the interface at the consumer" pattern as internal/ops's
@@ -66,7 +73,9 @@ func (t *Ticker) Run(ctx context.Context) {
 }
 
 func (t *Ticker) tick(ctx context.Context) {
-	pending, err := t.store.ListPending(ctx)
+	listCtx, cancel := context.WithTimeout(ctx, tickTimeout)
+	defer cancel()
+	pending, err := t.store.ListPending(listCtx)
 	if err != nil {
 		slog.Error("reminders: listing pending reminders", "error", err)
 		return
@@ -80,11 +89,17 @@ func (t *Ticker) tick(ctx context.Context) {
 			// cost given this app's reminder volume.
 			continue
 		}
-		if err := t.sender.SendMessage(ctx, t.chatID, r.Message); err != nil {
+		sendCtx, sendCancel := context.WithTimeout(ctx, tickTimeout)
+		err := t.sender.SendMessage(sendCtx, t.chatID, r.Message)
+		sendCancel()
+		if err != nil {
 			slog.Error("reminders: sending reminder", "id", r.ID, "error", err)
 			continue
 		}
-		if err := t.store.MarkSent(ctx, r.ID); err != nil {
+		markCtx, markCancel := context.WithTimeout(ctx, tickTimeout)
+		err = t.store.MarkSent(markCtx, r.ID)
+		markCancel()
+		if err != nil {
 			slog.Error("reminders: marking reminder sent", "id", r.ID, "error", err)
 		}
 	}
