@@ -447,3 +447,60 @@ matches `PLANNING.md`'s shell-first order one-for-one — see that file's
     `vite build` all clean. Same accepted browser-click-through gap as
     every other `/admin` change (steps 10-13): verified by test suite
     and code review, not a rendered browser session.
+20. **Scheduled reminders** (done, merged to `main` via the `sheduler`
+    branch, PR #23) — the generic "fire a Telegram message at a future
+    time, once" primitive scoped out while brainstorming the
+    subscriptions/finance tracker (`decisions.md`), built ahead of that
+    tracker itself per the same generic-capability-first pattern the
+    WebSockets shell used for the Ops panel (step 19). Design:
+    `docs/superpowers/specs/2026-08-17-reminders-design.md`. New
+    `internal/reminders` package: a Postgres-backed `Store`
+    (`Schedule`/`Cancel`/`Reschedule`/`ListPending`/`MarkSent`,
+    `Cancel`/`Reschedule` idempotent no-ops when no pending row matches
+    `source`) and a `Ticker` (functional-options, mirrors
+    `internal/ops.HealthTicker`'s shape, including its per-call
+    `context.WithTimeout` pattern — added in a final-review fix round,
+    see below) that polls hourly for due+pending reminders and delivers
+    them via the existing `internal/telegram.Client.SendMessage` — no
+    new delivery mechanism, no cadence/recurrence logic (that stays
+    with whichever feature owns a recurring obligation, starting with
+    the subscriptions tracker). A new `/reminders` command on the
+    existing Telegram `Router`, alongside `/notes`/`/newnote`/`/help`,
+    lists pending reminders soonest-first with human-relative due dates
+    ("in 2 days (Aug 19)"/"today"/"overdue"), reading `ListPending`
+    directly rather than through the ticker. No new HTTP endpoint, no
+    frontend surface — every consumer of this package is backend Go
+    code, per the design's non-goals.
+
+    Built via subagent-driven-development: four tasks (Store, Ticker,
+    `/reminders` command, startup wiring), each independently
+    implemented and reviewed clean. The plan's own sample code for
+    `humanRelative`'s day calculation (`int()` truncation) turned out
+    to fail the plan's own "overdue" test case (hand-verified: `int()`
+    truncates `-0.04` toward zero instead of down, misclassifying an
+    hour-overdue reminder as "today"); the implementing agent caught it
+    and switched to `math.Floor`, confirmed correct against all four
+    test cases by the task reviewer — a plan defect, not an
+    implementation one. The final whole-branch review (run at max
+    capability) found one real gap: `Ticker.tick` had no per-call
+    timeout, the one place it didn't actually mirror `HealthTicker`'s
+    pattern despite claiming to — fixed and re-reviewed clean in one
+    round.
+
+    While closing out the branch, also fixed a pre-existing, unrelated
+    test-isolation bug surfaced by the full-suite run:
+    `TestHandler_Me_Features_Admin` in `internal/auth` hardcoded user
+    ID 1, which only held against a freshly-seeded `users` table — noted
+    as a known pre-existing failure as far back as step 19, now fixed
+    to use the ID `CreateUser` actually returns.
+
+    Verified: full backend suite (`go test -p 1 ./...` against a real
+    Postgres) green, including the `internal/auth` fix above; `gofmt`/
+    `go vet` clean; `gitleaks detect`, frontend `npm audit`, backend
+    `govulncheck` all clean. No new dependencies, no new env vars, no
+    schema/CLI drift beyond the new `reminders` table (via the same
+    idempotent `EnsureSchema` pattern every other store uses). Same
+    accepted gap as the original Telegram bot v1 plan (step 14): the
+    manual end-to-end smoke test against a real Telegram bot (send
+    `/reminders`, confirm the hourly ticker actually delivers) needs a
+    human with bot access and has not been run as of this entry.

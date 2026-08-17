@@ -38,6 +38,7 @@ second copy.
   follow-up left open, see "Still open" below
   (`infra/deployment-runbook/` gitignore status).
 - ~~Ops panel live-update~~ — see `history.md` step 19.
+- ~~Scheduled reminders capability~~ — see `history.md` step 20.
 
 ## Still open
 
@@ -188,42 +189,24 @@ second copy.
   Worth a real look once it grows past this point (each new feature adds
   ~10-15 more lines of route registration) or the next time something
   wants to test routing/wiring directly — no design yet.
-- **Scheduled reminders capability** (brainstormed 2026-08-17) — a
-  cross-cutting "fire a Telegram message at a future time, once"
-  primitive, raised while scoping a subscription/finance tracker (see
-  next entry) once it became clear the tracker's "notify me before a
-  bill is due" need was really a generic platform capability, not a
-  tracker-specific feature — same relationship as the WebSockets shell
-  had to the Ops panel. Design done, not yet implemented: see
-  `docs/superpowers/specs/2026-08-17-reminders-design.md`. New
-  `internal/reminders` package (`Schedule`/`Cancel`/`Reschedule`/
-  `ListPending`), an hourly ticker delivering via the existing
-  `internal/telegram.Client.SendMessage` (no new delivery mechanism),
-  and a `/reminders` Telegram command. Deliberately scheduling-only —
-  event-driven pushes (new email, a Date Night response) need no
-  scheduling and call `Client.SendMessage` directly when their event
-  fires; a unified "notification" abstraction covering both was
-  considered and rejected as needless coupling. Also deliberately not
-  cadence-aware — recurrence (monthly/yearly, pause/resume) is business
-  logic that stays in whichever feature owns it, starting with the
-  subscriptions tracker below.
 - **Subscriptions / finance tracker** (brainstormed 2026-08-17, not yet
-  designed) — the concrete feature that prompted the reminders
-  capability above: a list of recurring/one-off financial obligations
-  (subscriptions, bills, a VPS balance running low) with cost and a due
-  date, for two purposes — visibility into recurring spend, and a
-  Telegram nudge (via the reminders capability) before something's due.
-  Single shared owner (just the operator), not per-user. Recurring
-  entries: monthly/yearly cadence only in v1 (no arbitrary N-day
-  interval), auto-advance the due date on schedule, with a pause/cancel
-  that stops advancing but keeps the row (soft-delete philosophy,
-  matching ADR 0002). One-off entries (no cadence) cover irregular cases
-  like the VPS balance — explicitly *not* solving general balance/
-  burn-rate tracking; a one-off reminder you manually recreate when you
-  top up is judged sufficient, real balance-tracking would be a much
-  bigger separate feature if it's ever needed. Needs its own brainstorm
-  (schema, UI, cost-summary view) once the reminders capability above
-  exists to build against.
+  designed) — the concrete feature that prompted the (now-shipped)
+  scheduled reminders capability, see `history.md` step 20: a list of
+  recurring/one-off financial obligations (subscriptions, bills, a VPS
+  balance running low) with cost and a due date, for two purposes —
+  visibility into recurring spend, and a Telegram nudge (via the
+  reminders capability) before something's due. Single shared owner
+  (just the operator), not per-user. Recurring entries: monthly/yearly
+  cadence only in v1 (no arbitrary N-day interval), auto-advance the
+  due date on schedule, with a pause/cancel that stops advancing but
+  keeps the row (soft-delete philosophy, matching ADR 0002). One-off
+  entries (no cadence) cover irregular cases like the VPS balance —
+  explicitly *not* solving general balance/burn-rate tracking; a
+  one-off reminder you manually recreate when you top up is judged
+  sufficient, real balance-tracking would be a much bigger separate
+  feature if it's ever needed. Needs its own brainstorm (schema, UI,
+  cost-summary view) — the reminders capability it builds against now
+  exists.
 - **"Personal assistant" platform vision** (raised 2026-08-17, not
   scoped) — the long-term framing the reminders/tracker work sits
   under: Telegram + APIs (e.g. pulling emails worth surfacing) as a
