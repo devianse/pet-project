@@ -104,6 +104,15 @@ second copy.
   prerequisite for WebSockets. WS auth is being designed against
   today's cookie behind a swappable interface so this can land later
   without a WS redesign. Needs its own brainstorm when picked up.
+
+  **Scope clarified (2026-08-18):** specifically means adopting an
+  OAuth2/OIDC *library* for the app's own self-issued tokens (e.g.
+  `ory/fosite`, `go-oauth2/oauth2`) — not delegating login to a
+  third-party IdP (Google/GitHub sign-in). The app stays invite-only,
+  self-hosted, single-audience; this is about swapping the hand-rolled
+  JWT issuance/validation code for a standard library's, not adding
+  federated identity. Recorded so this doesn't need re-clarifying next
+  time it's picked up.
 - **Telegram bot integration** — v1 (commands-in only: `/notes`,
   `/newnote`, `/help`) deployed to both dev and prod, two separate
   `@BotFather` bots per the routing constraint below; see
@@ -137,6 +146,46 @@ second copy.
   k8s" constraint elsewhere in `PLANNING.md`), whether it replaces or
   sits alongside the existing `slog`-based logging, and where it lands
   relative to WebSockets/Telegram in priority.
+
+  **Scope clarified (2026-08-18):** self-hosted is the intended answer,
+  not a hosted vendor — same VPS, one more service in
+  `infra/docker-compose.yml`. Motivation is partly practice/
+  learning-the-stack, not purely a scaling need — budgeted at ~300MB RAM
+  at most, which rules out a multi-container stack (the full Grafana
+  LGTM setup — separate Loki/Tempo/Mimir/Grafana containers — or a
+  ClickHouse-backed option like SigNoz) in favor of the single-container
+  `grafana/otel-lgtm` bundle: one image running Loki (logs) + Tempo
+  (traces) + Mimir/Prometheus (metrics) + Grafana (UI) + an OTel
+  Collector, pre-wired together with default dashboards. Takes the
+  compose stack from 3 containers (Caddy, backend, Postgres) to 4, not
+  4-8. No k8s dependency anywhere in this — OTel and Grafana both run
+  fine as plain Docker containers; the "no k8s" framing above is this
+  repo's general infra constraint (`PLANNING.md`), not something OTel
+  itself requires.
+
+  **What it actually gives, concretely (not just "observability" in the
+  abstract):** OTel is the instrumentation side — a Go SDK added to the
+  backend that emits three data types as requests flow through it.
+  *Traces* show a single request's shape as a span tree (e.g.
+  `GET /api/watchlist` → handler → DB query → the TMDb HTTP call, each
+  with its own duration) — turns "why was this slow" from a guess into
+  a number per hop. *Metrics* are aggregates over time (request rate,
+  p50/p95/p99 latency, error rate per route, DB pool usage) — what
+  dashboards and future alerts get built from. *Logs* are the existing
+  `slog` output, tagged with a trace ID so a log line can be linked back
+  to the request that produced it. Grafana doesn't generate any of this
+  — it's the query/visualization layer on top, cross-linking traces to
+  their logs in one UI. Real code is required to wire it up (`otelhttp`
+  middleware for auto-spans per request, `otelsql` or manual spans for
+  the DB layer, plus a decision on whether `slog` gets bridged through
+  an OTel log exporter or stays stdout-only for v1 — logs are the piece
+  easiest to defer, least new code for least payoff difference vs.
+  traces/metrics). Concrete payoff for this app: seeing whether a slow
+  Watchlist request is TMDb latency vs. Postgres vs. own code, a real
+  request-rate/error-rate dashboard instead of `docker compose logs |
+  grep`, and eventually giving the ops panel's "degraded" status an
+  actual latency number instead of just up/down. Recorded so this
+  doesn't need re-clarifying next time it's picked up.
 - **Redis (cache) or RabbitMQ (queue)** — not started, no design yet,
   no concrete driving need identified yet either. Two distinct options,
   not a package: Redis as a cache layer (session/query caching) vs.
