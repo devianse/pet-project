@@ -1,6 +1,8 @@
 module github.com/devianse/pet-project/backend
 
-go 1.26.6
+go 1.27.0
+
+toolchain go1.27.4
 
 require (
 	github.com/coder/websocket v1.8.15
