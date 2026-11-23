@@ -99,7 +99,17 @@ func newApp(conn *sql.DB, cfg Config) (*App, error) {
 		if err != nil {
 			return realtime.Identity{}, err
 		}
-		return realtime.Identity{UserID: userID, Role: claims.Role}, nil
+		// Role and active status come from the database, not the claim.
+		// The REST side already refuses to trust a stale admin claim
+		// (access.RequireRole / HasFeature); doing it differently here let
+		// a demoted admin keep ops.* — which carries the audit log — for
+		// the life of the token, and a deactivated user keep a socket open
+		// at all. One extra lookup per handshake, not per frame.
+		user, err := authStore.FindByID(r.Context(), userID)
+		if err != nil || user == nil || !user.IsActive {
+			return realtime.Identity{}, auth.ErrInvalidToken
+		}
+		return realtime.Identity{UserID: user.ID, Role: user.Role}, nil
 	})
 
 	// opsTopicAuthorizer is the first real per-topic policy: ops.* is
@@ -124,7 +134,14 @@ func newApp(conn *sql.DB, cfg Config) (*App, error) {
 	healthTicker := ops.NewHealthTicker(conn, realtimeHub, cfg.GitSHA)
 
 	authHandler := auth.NewHandler(authStore, []byte(cfg.JWTSecret), cfg.SecureCookies, accessStore)
-	requireAuth := auth.Require([]byte(cfg.JWTSecret))
+	// requireAuth is signature *and* liveness: Require checks the JWT,
+	// RequireActive re-reads is_active from the database so a deactivated
+	// (or deleted) user's already-issued cookie stops working immediately
+	// instead of surviving to TokenTTL. Composed here so every route that
+	// says "requireAuth" gets both, and none can opt out by accident.
+	requireAuth := func(h http.Handler) http.Handler {
+		return auth.Require([]byte(cfg.JWTSecret))(auth.RequireActive(authStore)(h))
+	}
 	requireFeature := func(key string) func(http.Handler) http.Handler {
 		return access.RequireFeature(accessStore, key)
 	}
