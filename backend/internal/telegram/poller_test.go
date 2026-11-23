@@ -137,3 +137,91 @@ func TestPoller_Run_RetriesWithBackoffOnGetUpdatesError(t *testing.T) {
 		t.Fatalf("expected Run to retry after an error, got %d call(s)", calls)
 	}
 }
+
+// offsetRecorder records the offset each GetUpdates call was made with,
+// which is the only way to observe that SkipBacklog actually advanced the
+// poller's in-memory offset.
+type offsetRecorder struct {
+	mu       sync.Mutex
+	offsets  []int64
+	backlog  []Update
+	cancel   context.CancelFunc
+	sentText []string
+}
+
+func (o *offsetRecorder) GetUpdates(_ context.Context, offset int64, _ int) ([]Update, error) {
+	o.mu.Lock()
+	o.offsets = append(o.offsets, offset)
+	n := len(o.offsets)
+	o.mu.Unlock()
+	if n == 1 {
+		return o.backlog, nil
+	}
+	if o.cancel != nil {
+		o.cancel()
+	}
+	return nil, nil
+}
+
+func (o *offsetRecorder) SendMessage(_ context.Context, _ int64, text string) error {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.sentText = append(o.sentText, text)
+	return nil
+}
+
+// Without this, every restart re-ran the backlog: /newnote is a write,
+// so a deploy duplicated notes typed since the last restart.
+func TestPoller_SkipBacklog_AdvancesOffsetWithoutDispatching(t *testing.T) {
+	rec := &offsetRecorder{backlog: []Update{
+		{UpdateID: 5, Message: &Message{Chat: Chat{ID: 555}, Text: "/ping"}},
+		{UpdateID: 6, Message: &Message{Chat: Chat{ID: 555}, Text: "/ping"}},
+	}}
+	router := NewRouter()
+	router.Handle("/ping", "ping", func(_ context.Context, _ string) (string, error) { return "pong", nil })
+
+	p := NewPoller(rec, 555, router)
+	if err := p.SkipBacklog(context.Background()); err != nil {
+		t.Fatalf("SkipBacklog: %v", err)
+	}
+	rec.mu.Lock()
+	sent := append([]string(nil), rec.sentText...)
+	rec.mu.Unlock()
+	if len(sent) != 0 {
+		t.Fatalf("SkipBacklog must discard, not dispatch, got replies %v", sent)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	rec.cancel = cancel
+	p.Run(ctx)
+
+	rec.mu.Lock()
+	offsets := append([]int64(nil), rec.offsets...)
+	rec.mu.Unlock()
+	if len(offsets) < 2 {
+		t.Fatalf("expected a SkipBacklog call plus at least one Run call, got %v", offsets)
+	}
+	if offsets[0] != -1 {
+		t.Fatalf("expected SkipBacklog to request offset -1, got %d", offsets[0])
+	}
+	if last := offsets[len(offsets)-1]; last != 7 {
+		t.Fatalf("expected Run to resume at offset 7 (past the backlog), got %d", last)
+	}
+}
+
+func TestPoller_SkipBacklog_NoBacklogLeavesOffsetAtZero(t *testing.T) {
+	rec := &offsetRecorder{}
+	p := NewPoller(rec, 555, NewRouter())
+	if err := p.SkipBacklog(context.Background()); err != nil {
+		t.Fatalf("SkipBacklog: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	rec.cancel = cancel
+	p.Run(ctx)
+	rec.mu.Lock()
+	offsets := append([]int64(nil), rec.offsets...)
+	rec.mu.Unlock()
+	if len(offsets) >= 2 && offsets[1] != 0 {
+		t.Fatalf("expected offset 0 with an empty backlog, got %d", offsets[1])
+	}
+}

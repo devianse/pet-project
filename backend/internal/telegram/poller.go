@@ -73,6 +73,34 @@ func (p *Poller) Run(ctx context.Context) {
 	}
 }
 
+// SkipBacklog discards updates that queued up while the poller was not
+// running, and must be called once before Run.
+//
+// Telegram's getUpdates keeps unacknowledged updates for ~24h, and the
+// offset lives in memory, so a restart starts from 0 and the whole
+// backlog is redelivered. For this bot that is not a cosmetic problem:
+// /newnote is a write, so every deploy re-executed the notes typed
+// since the last restart and duplicated them.
+//
+// Skipping rather than persisting the offset is deliberate — the
+// container filesystem is rebuilt on deploy and there is no store worth
+// writing to for a single integer, and "commands sent while the bot was
+// down are dropped" is the right semantics for read-mostly commands.
+// If a future command is important enough to require guaranteed
+// delivery, this is the place to swap in a persisted offset.
+func (p *Poller) SkipBacklog(ctx context.Context) error {
+	updates, err := p.client.GetUpdates(ctx, -1, 0)
+	if err != nil {
+		return err
+	}
+	for _, u := range updates {
+		if u.UpdateID+1 > p.offset {
+			p.offset = u.UpdateID + 1
+		}
+	}
+	return nil
+}
+
 func (p *Poller) handleUpdate(ctx context.Context, u Update) {
 	if u.Message == nil {
 		return // update type this package doesn't handle (edited message, etc.)
