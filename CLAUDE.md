@@ -44,6 +44,12 @@ terminals simultaneously, which README explains in detail.
 - **`frontend/src/components/pouf/` is off-limits for manual edits** —
   it's vendored/CLI-managed (see README's "Layout" section). Regenerate
   or add to it via the shadcn CLI, don't hand-edit.
+- **One scope, one branch, one worktree.** Independent changes (a dep
+  bump, a docs refresh, a behaviour fix) get separate branches even when
+  found in one sitting — they have different review and revert stories.
+  `git worktree add -b fix/<scope> ../pp-wt-<scope> origin/main` keeps
+  them building in parallel without stashing; the close-out skill's
+  Step 5 removes the worktree once the branch is pushed.
 - **Never commit without being asked.** Staging/committing is the user's
   call, every time — not implied by "this looks done."
 - **A PR isn't ready unless `npm audit` (frontend), `govulncheck ./...`
