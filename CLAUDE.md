@@ -36,6 +36,16 @@ See `README.md`'s "Running locally" and "Other commands" sections for the
 full `make` target list — both dev servers block and must run in separate
 terminals simultaneously, which README explains in detail.
 
+## Workflow
+
+The mechanical loop for landing a change — worktree per scope, which
+gates to run, the three scans that gate a PR, and worktree cleanup — is
+in [`docs/workflow.md`](./docs/workflow.md). Read it before starting a
+fix, not after: step 0 there (getting a real test database running) is
+the step that silently fails, since backend integration tests `t.Skip`
+without `DATABASE_URL` and the suite prints `ok` while asserting
+nothing.
+
 ## Conventions
 
 - **`@/*` path alias**: resolves to `frontend/src/*` (set up in
