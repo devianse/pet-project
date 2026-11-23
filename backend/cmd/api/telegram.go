@@ -56,6 +56,12 @@ func startTelegramBot(ctx context.Context, logger *slog.Logger, notesStore *note
 	}
 
 	poller := telegram.NewPoller(client, chatID, router)
+	// Drop anything queued while the bot was down before the real loop
+	// starts, or every deploy replays the backlog (see SkipBacklog).
+	// Non-fatal: if it fails, Run still starts and behaves as before.
+	if err := poller.SkipBacklog(ctx); err != nil {
+		logger.Error("telegram: failed to skip update backlog", "error", err)
+	}
 	go poller.Run(ctx)
 
 	// remindersTicker delivers scheduled reminders (see internal/reminders)
