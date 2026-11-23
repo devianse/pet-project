@@ -41,6 +41,7 @@ export function UserMenu() {
   const { user, logout, updateProfile } = useAuth()
   const [open, setOpen] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   if (!user) return null
 
@@ -53,15 +54,29 @@ export function UserMenu() {
     if (next) setNameDraft(user!.display_name ?? '')
   }
 
+  // Both save paths are fire-and-forget from the UI's point of view (blur
+  // on the input, click on a swatch), so without a try/catch a failed
+  // PATCH /api/me was an unhandled rejection that silently left the
+  // popover showing a value the server had rejected.
   async function saveName() {
     const trimmed = nameDraft.trim()
     if (trimmed === (user!.display_name ?? '')) return
-    await updateProfile({ display_name: trimmed || null, avatar_color: user!.avatar_color })
+    setSaveError(null)
+    try {
+      await updateProfile({ display_name: trimmed || null, avatar_color: user!.avatar_color })
+    } catch {
+      setSaveError('could not save the name — try again')
+    }
   }
 
   async function saveColor(next: AvatarTone) {
     if (next === user!.avatar_color) return
-    await updateProfile({ display_name: user!.display_name, avatar_color: next })
+    setSaveError(null)
+    try {
+      await updateProfile({ display_name: user!.display_name, avatar_color: next })
+    } catch {
+      setSaveError('could not save the color — try again')
+    }
   }
 
   async function handleLogout() {
@@ -97,6 +112,11 @@ export function UserMenu() {
                   placeholder={user.username}
                   label="Display name"
                 />
+                {saveError && (
+                  <p role="alert" className="font-bold text-[13px] text-(--on-accent) bg-orange rounded-lg px-2 py-1">
+                    {saveError}
+                  </p>
+                )}
                 <Text size="sm" muted truncate>
                   @{user.username}
                 </Text>

@@ -41,6 +41,14 @@ export class RealtimeClient {
     if (this.ws && this.ws.readyState !== WebSocket.CLOSED) {
       return
     }
+    // The guard above only covers a live socket. A reconnect can still be
+    // scheduled from a drop whose ws is already CLOSED, in which case a
+    // second connect() here would open a socket AND let the pending timer
+    // open another, orphaning the first. Clear it either way.
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
+    }
     this.open()
   }
 

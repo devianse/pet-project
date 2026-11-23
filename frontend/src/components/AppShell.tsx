@@ -49,7 +49,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="flex min-h-screen flex-col md:flex-row bg-bg text-ink">
       <nav
         aria-label="Primary"
-        className="flex flex-row items-center gap-2 overflow-x-auto p-3 md:flex-col md:items-stretch md:gap-3 md:overflow-visible md:w-55hrink-0 md:p-6 bg-surface [&>a]:shrink-0 [&>a]:whitespace-nowrap"
+        className="flex flex-row items-center gap-2 overflow-x-auto p-3 md:flex-col md:items-stretch md:gap-3 md:overflow-visible md:w-55 md:shrink-0 md:p-6 bg-surface [&>a]:shrink-0 [&>a]:whitespace-nowrap"
       >
         <div className="hidden md:block px-2 pb-2 font-black text-lg text-ink">
           pet-projects
