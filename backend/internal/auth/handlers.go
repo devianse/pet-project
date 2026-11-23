@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/devianse/pet-project/backend/internal/platform"
 )
@@ -63,6 +64,9 @@ var allowedAvatarColors = map[string]bool{
 	"orange": true,
 }
 
+// maxDisplayNameLength is counted in runes, not bytes — see UpdateMe,
+// which uses utf8.RuneCountInString. A byte count would cut a CJK or
+// Cyrillic display name to a third of its intended length.
 const maxDisplayNameLength = 60
 
 // dummyHash is a valid bcrypt hash of no real password. Used to make
@@ -216,7 +220,7 @@ func (h *Handler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 
 	if req.DisplayName != nil {
 		trimmed := strings.TrimSpace(*req.DisplayName)
-		if len(trimmed) > maxDisplayNameLength {
+		if utf8.RuneCountInString(trimmed) > maxDisplayNameLength {
 			http.Error(w, "display_name too long", http.StatusBadRequest)
 			return
 		}

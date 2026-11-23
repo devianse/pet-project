@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/devianse/pet-project/backend/internal/auth"
 	"github.com/devianse/pet-project/backend/internal/platform"
@@ -90,10 +91,10 @@ func validateActivityInput(name string, description *string, category Category) 
 	if strings.TrimSpace(name) == "" {
 		return errors.New("name must not be empty")
 	}
-	if len(name) > maxActivityNameLength {
+	if utf8.RuneCountInString(name) > maxActivityNameLength {
 		return errors.New("name exceeds maximum length")
 	}
-	if description != nil && len(*description) > maxActivityDescriptionLength {
+	if description != nil && utf8.RuneCountInString(*description) > maxActivityDescriptionLength {
 		return errors.New("description exceeds maximum length")
 	}
 	if !IsValidCategory(category) {
