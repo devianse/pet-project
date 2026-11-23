@@ -4,6 +4,7 @@ package access
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 )
 
@@ -232,7 +233,7 @@ func HasFeature(ctx context.Context, store *Store, userID int64, role, key strin
 func (s *Store) currentRole(ctx context.Context, userID int64) (string, error) {
 	var role string
 	err := s.conn.QueryRowContext(ctx, `SELECT role FROM users WHERE id = $1`, userID).Scan(&role)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
 	return role, err

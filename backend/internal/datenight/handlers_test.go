@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -320,5 +321,21 @@ func TestHandler_CreateProposal_IncludesProposedByUsername(t *testing.T) {
 	}
 	if created.ProposedByUsername != "alice" {
 		t.Fatalf("expected proposed_by_username %q in JSON response, got %q", "alice", created.ProposedByUsername)
+	}
+}
+
+// The limit is a rune count, not a byte count: a 200-character CJK name
+// is 600 bytes, and a byte-based check would reject it (and silently
+// truncate what a user is allowed to type).
+func TestValidateActivityInput_CountsRunesNotBytes(t *testing.T) {
+	cjk := strings.Repeat("运", maxActivityNameLength)
+	if len(cjk) != maxActivityNameLength*3 {
+		t.Fatalf("fixture is not multi-byte: %d bytes for %d runes", len(cjk), maxActivityNameLength)
+	}
+	if err := validateActivityInput(cjk, nil, CategoryCozy); err != nil {
+		t.Fatalf("expected %d runes to be accepted, got %v", maxActivityNameLength, err)
+	}
+	if err := validateActivityInput(cjk+"运", nil, CategoryCozy); err == nil {
+		t.Fatal("expected maxActivityNameLength+1 runes to be rejected")
 	}
 }
