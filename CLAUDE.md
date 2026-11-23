@@ -11,24 +11,40 @@ made, or a term is undefined.
 
 ## Current phase
 
-Phase 1 (barebones scaffold) is done. Phase 2's first half — real JWT
+Phase 1 (barebones scaffold) is done. Phase 2 is done in full: real JWT
 auth (invite-only accounts, httpOnly session cookie, `admin`/`user`
-roles) — is done and merged to `main`. Phase 2's second half,
-WebSockets, has NOT started — don't assume it exists. Several small
-features (Notes, design system, pre-deployment security hardening,
-Movie/TV Sharing List, Date Night) have landed ahead of phase 2/3 as
-deliberate detours, alongside a first VPS deployment (live at
-`mikelab.dev`) — see `planning/history.md` for the current sequence, not
-just the original phase breakdown in `PLANNING.md`.
+roles) *and* the WebSockets shell (`internal/realtime`, `GET /api/ws`,
+PR #21) are both merged to `main` and in production use — the Ops panel
+already consumes `ops.health`/`ops.audit` over it, so don't treat
+WebSockets as unbuilt.
+
+Beyond that, several features landed ahead of phase 2/3 as deliberate
+detours: Notes, the design system, pre-deployment security hardening,
+Movie/TV Sharing List, Date Night, the admin grants panel, the audit
+log/Ops panel, the Telegram bot, graceful shutdown, Postgres
+backup/restore, and the reminders primitive — alongside a first VPS
+deployment (live at `mikelab.dev`). See `planning/history.md` for the
+current sequence, not just the original phase breakdown in
+`PLANNING.md`.
+
+Open threads worth knowing before you start: WebSockets has no consumers
+beyond Ops yet; the WS authenticator still trusts the role from the JWT
+claim rather than re-reading it from the database (see
+`planning/security-todo.md`); notes are still ownerless/shared; and the
+Subscriptions feature has an approved spec and plan but no code.
 
 ## Layout
 
 See `README.md`'s "Layout" section for the directory tree. `docs/`
-already holds design specs (`docs/superpowers/specs/`); `infra/` gets
-its first content (Caddyfile, docker-compose.yml) as part of the
-pre-deployment security hardening work. `planning/` holds history/
-decisions/security-TODO notes split out of `PLANNING.md` for size — see
-that file's own pointer table for what's where.
+holds the ADRs (`docs/adr/`); the design specs and implementation plans
+under `docs/superpowers/` are **gitignored and exist only on the
+author's machine** — they are not in a fresh clone and not on GitHub, so
+treat a `docs/superpowers/...` link elsewhere in these docs as
+unresolvable unless you are on that machine. `infra/` is populated
+(Caddyfile, docker-compose, backup/restore scripts) and the stack is
+deployed. `planning/` holds history/decisions/security-TODO notes split
+out of `PLANNING.md` for size — see that file's own pointer table for
+what's where.
 
 ## Commands
 
