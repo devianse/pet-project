@@ -88,6 +88,21 @@ func (s *Store) FindByID(ctx context.Context, id int64) (*User, error) {
 	return scanUser(row)
 }
 
+// IsActive reports whether a user row exists and is not deactivated. A
+// missing row reports false with no error, so callers treat "deleted" and
+// "deactivated" the same way — both mean the session is no longer good.
+// Used by auth.RequireActive; see that function's doc comment.
+func (s *Store) IsActive(ctx context.Context, id int64) (bool, error) {
+	var active bool
+	err := s.conn.QueryRowContext(ctx, `
+		SELECT is_active FROM users WHERE id = $1
+	`, id).Scan(&active)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	return active, err
+}
+
 // ListUsers returns every user, ordered by username, for the admin
 // grants UI (access.AdminHandler). No pagination — the user base is
 // small and invite-only.

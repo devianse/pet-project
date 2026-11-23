@@ -175,6 +175,14 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
+	// /api/me is mounted without the Require+RequireActive chain (it does
+	// its own cookie check to reuse the parsed claims), so it needs the
+	// same liveness rule explicitly — otherwise a deactivated account
+	// keeps reading its own profile for the life of the token.
+	if !user.IsActive {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	resp, err := h.buildMeResponse(r.Context(), user)
 	if err != nil {
 		slog.Error("building me response", "error", err)
@@ -204,6 +212,20 @@ func (h *Handler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 	}
 	userID, err := claims.UserID()
 	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Same liveness rule as Me (see its comment): this route is mounted
+	// without the middleware chain, so a deactivated account must not be
+	// able to keep editing its profile on a still-valid cookie.
+	active, err := h.store.IsActive(r.Context(), userID)
+	if err != nil {
+		slog.Error("check active", "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if !active {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
