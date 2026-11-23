@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { createNotes, deleteNote, getNotes, type Note } from '../../shared/api'
+import { createNotes, deleteNote, getNotes, type Note } from '@/shared/api'
 import { Card, RowCard } from '@/components/pouf/surface'
 import { Field, Input } from '@/components/pouf/Input'
 import { Button, IconButton } from '@/components/pouf/Button'
@@ -15,6 +15,7 @@ export default function NotesPage() {
   const [staged, setStaged] = useState<string[]>([])
   const [draft, setDraft] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     getNotes()
@@ -33,7 +34,11 @@ export default function NotesPage() {
   }
 
   async function save() {
-    if (staged.length === 0) return
+    // Guard against a double-click re-POSTing the same staged notes:
+    // `staged` is only cleared after the response arrives, so without
+    // this a second click fires a second createNotes with the same text.
+    if (staged.length === 0 || saving) return
+    setSaving(true)
     setError(null)
     try {
       const updated = await createNotes(staged)
@@ -41,6 +46,8 @@ export default function NotesPage() {
       setStaged([])
     } catch {
       setError('failed to save notes')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -101,7 +108,7 @@ export default function NotesPage() {
                 </Row>
               </RowCard>
             ))}
-            <Button onClick={save} tone="mint" block>
+            <Button onClick={save} tone="mint" block disabled={saving}>
               Save
             </Button>
           </Stack>

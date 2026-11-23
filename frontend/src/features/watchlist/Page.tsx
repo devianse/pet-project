@@ -6,7 +6,7 @@ import {
   removeFromWatchlist,
   setWatchlistItemViewed,
   type WatchlistItem,
-} from '../../shared/api'
+} from '@/shared/api'
 import { Card, RowCard } from '@/components/pouf/surface'
 import { Field, Input } from '@/components/pouf/Input'
 import { Button, IconButton } from '@/components/pouf/Button'
