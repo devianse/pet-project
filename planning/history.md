@@ -553,3 +553,70 @@ matches `PLANNING.md`'s shell-first order one-for-one — see that file's
     -v` both clean. No schema change, no new env vars, no behavior change
     to any existing route — pure structural refactor plus one dead CLI
     removed.
+
+22. **Review sweep: live-session revocation, Telegram backlog replay,
+    dependency and language fixes** (done, merged to `main` via PRs #25,
+    #27, #28, #29, #30) — a whole-repo review (backend, frontend,
+    docs-vs-code drift) run in parallel worktrees off `main`, with each
+    finding landed as its own single-scope PR.
+
+    - **PR #25 — dependencies.** `npm audit fix` cleared `vite` 8.2.0–8.2.2
+      (6 advisories, 2 high) and `source-map-js`; `npm audit` is now
+      clean. `golang.org/x/text` v0.40.0 → v0.44.0 cleared GO-2026-6629.
+      The 11 remaining `govulncheck` findings are all Go standard library
+      and need a Go 1.27 toolchain, deliberately deferred: that also
+      requires bumping `backend/Dockerfile`'s `golang:1.26-alpine` base,
+      so the deploy build and local build move together.
+    - **PR #27 — live-session revocation.** `is_active` was read in
+      exactly one place (`auth/handlers.go`, at login), so deactivating a
+      user blocked *login* only: the session cookie is a single
+      long-lived token (`TokenTTL`, 14 days) with no revocation path, so
+      an existing cookie kept full API access for its remaining life.
+      The WebSocket authenticator compounded it by taking the role from
+      the JWT claim, letting a demoted admin keep `ops.*` (which streams
+      the audit log). New `auth.Store.IsActive` + composable
+      `auth.RequireActive`, chained into `cmd/api`'s `requireAuth` so no
+      route can opt out; `/api/me` (mounted without the chain) checks
+      inline; `wsAuthenticator` now resolves role and active status from
+      the users table at handshake. This applies the doctrine
+      `access.RequireRole`/`HasFeature` already followed — a claim is a
+      snapshot, the database is the truth. General token revocation
+      (leaked `JWT_SECRET`, password reset invalidating old cookies) is
+      still not implemented and stays in `planning/security-todo.md`.
+    - **PR #28 — Telegram backlog.** `Poller.offset` is in-memory and
+      starts at 0; Telegram keeps unacknowledged updates ~24h, so every
+      restart re-ran the backlog and `/newnote` (a write) duplicated
+      notes on each deploy. New `Poller.SkipBacklog`, called once before
+      `Run`, advances past the backlog without dispatching. Skipping
+      rather than persisting is deliberate — the container filesystem is
+      rebuilt on deploy and there is no store worth one integer.
+    - **PR #29 — frontend defects.** `md:w-55hrink-0` in `AppShell` (a
+      botched merge of `md:w-55 md:shrink-0`, so the desktop nav got
+      neither class); `RealtimeClient.connect()` leaked a socket when a
+      reconnect was already scheduled; `UserMenu`'s two async save paths
+      had no `try/catch`, making a failed `PATCH /api/me` a silent
+      unhandled rejection; Notes' Save had no in-flight guard and
+      re-POSTed on a double-click; `components.json`'s `ui` alias pointed
+      at a nonexistent `@/components/ui`; `index.html` still had the Vite
+      default title; two files used relative imports against the `@/*`
+      convention.
+    - **PR #30 — language-level backend fixes.** Length limits in
+      `auth` (display name) and `datenight` (activity name/description)
+      counted bytes, not runes, capping CJK and Cyrillic input at roughly
+      a third of the intended length; `access.go` compared
+      `err == sql.ErrNoRows` instead of `errors.Is`.
+
+    Also **PR #26 — docs freshness**, since the review found the
+    orientation docs actively misleading: `CLAUDE.md` claimed WebSockets
+    "has NOT started" three PRs after it shipped, `PLANNING.md`'s "Still
+    open" repeated it, four `history.md` entries still said "not yet
+    merged" for merged work, and 20 references point into
+    `docs/superpowers/`, which is gitignored and absent from a clone.
+    Those references are documented as unresolvable rather than deleted —
+    committing or dropping them is still an open decision.
+
+    Verified per PR: `gofmt`/`go vet`/`tsc -b`/`vite build` clean; full
+    backend suite green against a real Postgres (242 pass, 0 skip, 0
+    fail — note the suite skips 139 tests silently without
+    `DATABASE_URL`); `go test -race -p 1 ./...` reported 0 data races;
+    `gitleaks` clean. No schema change.

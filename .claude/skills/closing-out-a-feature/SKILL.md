@@ -23,8 +23,37 @@ we decide how to integrate this."
 
 ## Step 1: Verify
 
-Run the project's test suites (backend `go test ./...`, frontend if it
-has tests), then:
+**First, confirm the backend suite actually ran.** Most backend tests are
+integration tests against a real Postgres and call `t.Skip` when
+`DATABASE_URL` is unset — so `go test ./...` prints a wall of `ok` while
+having asserted almost nothing (on a machine with no database the split
+is roughly 103 real passes against 139 skips). A green-looking run is
+not a green run:
+
+```bash
+docker start pet-projects-notes-db
+export DATABASE_URL='postgres://postgres@127.0.0.1:5432/notes?sslmode=disable'
+cd backend && go test -p 1 -v ./... 2>&1 | grep -cE '^\s*--- SKIP'
+```
+
+Treat a non-zero skip count as a red run and fix the database before
+continuing. Note the trap: if `pet-projects-notes-db` was created without
+`-p 5432:5432` it starts cleanly and is still unreachable from the host,
+so the tests skip rather than fail — indistinguishable from success.
+Recreate it with the port mapping; the data is in the named volume
+`pet-projects-notes-db-data`, so pass `-v
+pet-projects-notes-db-data:/var/lib/postgresql/data` to keep it.
+
+Then run the project's test suites (backend `go test -p 1 ./...`,
+frontend `npm run test`), plus the race detector, which nothing else in
+this repo runs and which is the only check covering the WebSocket Hub and
+rate-limiter goroutines:
+
+```bash
+cd backend && go test -race -p 1 ./...
+```
+
+Then the three scans CLAUDE.md gates a PR on:
 
 ```bash
 make scan-secrets audit-frontend audit-backend
@@ -34,6 +63,18 @@ make scan-secrets audit-frontend audit-backend
 on a red build. This mirrors `finishing-a-development-branch`'s own
 test gate; running it here means the security/audit checks CLAUDE.md
 requires are no longer something to remember to do "by hand."
+
+Two failure modes worth recognising so they aren't misdiagnosed:
+
+- **`govulncheck` prints `package requires newer Go version goX.Y`** —
+  that is not a vulnerability finding, it means the installed
+  `govulncheck` binary is older than `go.mod`'s `go` directive. Rebuild
+  it (`go install golang.org/x/vuln/cmd/govulncheck@latest`) and rerun.
+  This always happens after a Go version bump.
+- **A pre-existing failure on `main` is not this branch's regression, but
+  it still blocks the bar.** Say so explicitly, and if the fix is
+  independent, land it as its own PR first so later PRs inherit a clean
+  base.
 
 ## Step 2: Drift Checks
 
@@ -137,6 +178,19 @@ sessions may have left running; that's a separate concern.
    the only long-lived resource in this repo's local dev setup today;
    if that changes, update this list rather than guessing at cleanup
    time.
+4. **Remove any git worktree this session created.** Once the branch is
+   pushed (Step 3) the worktree has served its purpose — the PR holds
+   the diff and the branch lives on `origin`:
+
+   ```bash
+   git worktree remove ../pp-wt-<scope> --force
+   git worktree list        # confirm it's gone
+   ```
+
+   Don't leave them lying around: a forgotten worktree pins an old
+   `origin/main` checkout in place and is indistinguishable from
+   work still in progress. The leftover local branch ref is harmless —
+   `git fetch --prune` after the merge clears it.
 
 If something is running and you're not sure whether this session
 started it or it predates this work, ask rather than killing it.
