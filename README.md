@@ -10,8 +10,14 @@ and reasoning.
 ```
 backend/   Go API (cmd/api is the entrypoint binary)
 frontend/  React SPA (Vite)
-infra/     deploy config (Caddyfile, docker-compose) — added once deployment starts
+infra/     deploy config (Caddyfile, docker-compose, backup/restore scripts)
 ```
+
+> **Note on `docs/superpowers/`**: several docs in this repo link to
+> design specs and implementation plans under `docs/superpowers/`. That
+> folder is gitignored — it exists only on the author's machine, so
+> those links do not resolve in a fresh clone or on GitHub. The durable
+> decisions that *are* version-controlled live in `docs/adr/`.
 
 Two independent apps, each managing its own dependencies (`go.mod`,
 `package.json`) in its own subfolder — no monorepo tooling needed at this

@@ -42,13 +42,22 @@ asset.
 
 Still open:
 
-- **Real-time (WebSockets)** — meant to be a cross-cutting platform
-  feature (available to any project plugged in later), not a dedicated
-  page. Not started — see `planning/decisions.md`.
-- **Telegram bot integration** — same "cross-cutting capability, not a
-  page" relationship as WebSockets. v1 (commands-in: `/notes`,
-  `/newnote`) built on the `telegram` branch, not yet merged — see
-  `planning/history.md` entry 14 and `planning/decisions.md`.
+- **Real-time (WebSockets)** — the shell is **shipped** (`internal/realtime`,
+  `GET /api/ws`, PR #21) and the Ops panel already uses it for
+  `ops.health`/`ops.audit` (PR #22). What is still open is *consumers*:
+  live sync for the Shopping List and Date Night updates, and closing the
+  gap where the WS authenticator takes the role from the JWT claim
+  instead of re-reading it from the database — see
+  `planning/security-todo.md`.
+- **Telegram bot integration** — v1 (commands-in: `/notes`, `/newnote`,
+  `/reminders`, `/help`) is **merged** (PRs #17, #19). Still open is the
+  notifications-out half (notifying the paired Date Night account), plus
+  the manual end-to-end smoke test that has never been run.
+- **Subscriptions / finance tracker** — approved spec and a full
+  task-by-task plan exist; no code yet. It is the intended consumer of
+  the `internal/reminders` primitive, which shipped with no producer.
+- **Notes per-person ownership** — approved, not implemented. Also the
+  permanent fix for the `go test -p 1` crutch (see the Makefile note).
 
 Standing decisions (not "todo," deliberate choices not to build
 something — worth keeping since the absence isn't visible from the code

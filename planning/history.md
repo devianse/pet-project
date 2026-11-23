@@ -175,8 +175,8 @@ matches `PLANNING.md`'s shell-first order one-for-one — see that file's
     vulnerabilities unrelated to this branch — no new dependency was
     added). Same accepted gap as steps 10-11: no browser click-through,
     verified via backend tests and static review only.
-13. **Audit trail + ops/system panel** (done, on the `audit-ops` branch,
-    not yet merged) — the first of the two deferred admin-panel
+13. **Audit trail + ops/system panel** (done, merged as PR #16) — the
+    first of the two deferred admin-panel
     observability options from step 12's decision (the other, app data
     moderation, stays deferred — see `planning/decisions.md`). A
     read-only introspection page added to the same `/admin` panel as
@@ -211,7 +211,7 @@ matches `PLANNING.md`'s shell-first order one-for-one — see that file's
     pre-existing Go-toolchain stdlib vulnerabilities as step 12,
     confirmed present even with this branch's changes stashed out — not
     introduced here; no new dependency was added).
-14. **Telegram bot v1** (done, on the `telegram` branch, not yet merged)
+14. **Telegram bot v1** (done, merged as PR #17)
     — a commands-in Telegram bot for the app, implemented per
     `docs/superpowers/specs/2026-08-14-telegram-bot-design.md` and
     `docs/superpowers/plans/2026-08-14-telegram-bot-v1.md` via
@@ -262,8 +262,8 @@ matches `PLANNING.md`'s shell-first order one-for-one — see that file's
     Task 5 of the plan (manual verification against the real Telegram
     API) was explicitly not automated — needs a real bot token and a
     real Telegram account, left for manual follow-up.
-15. **Backend process lifecycle hardening** (done, on the
-    `backend-graceful-shutdown` branch, not yet merged) — a small
+15. **Backend process lifecycle hardening** (done, merged as PR #18) — a
+    small
     follow-up prompted by a `golang-design-patterns` review-mode audit
     of the backend, done ahead of phase 2's WebSockets work so
     shutdown/lifecycle plumbing exists before long-lived socket
@@ -310,7 +310,7 @@ matches `PLANNING.md`'s shell-first order one-for-one — see that file's
     rebuild (no code changed on the VPS side, `infra/.env` already had
     both vars wired into `docker-compose.yml` from step 14). Verified
     live against the prod bot the same way as dev.
-17. **Home page redesign** (done, not yet committed) — replaced the
+17. **Home page redesign** (done, committed as `822b3ef`) — replaced the
     Phase 1 wiring-check stub (title + raw backend-health text, now
     that Admin's Ops section owns health) with a combinatoric,
     mobile-first cover page. Bounded-path work (brainstormed, short
